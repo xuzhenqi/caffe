@@ -406,6 +406,21 @@ Dtype SGDSolver<Dtype>::GetLearningRate() {
     rate = this->param_.base_lr() * (Dtype(1.) /
         (Dtype(1.) + exp(-this->param_.gamma() * (Dtype(this->iter_) -
           Dtype(this->param_.stepsize())))));
+  } else if (lr_policy == "preset") {
+      int num_lr = this->param_.lr_size();
+      int num_lr_change = this->param_.lr_change_size();
+      CHECK_EQ(num_lr,num_lr_change);
+
+      if (this->iter_ >= this->param_.lr_change(num_lr-1)) {
+        //End training
+        this->iter_ = this->param_.max_iter();
+      } else {
+        for(int i = num_lr-1; i >= 0; i--) {
+          if (this->iter_ < this->param_.lr_change(i)) {
+            rate = this->param_.lr(i);
+          }
+        }
+      }
   } else {
     LOG(FATAL) << "Unknown learning rate policy: " << lr_policy;
   }

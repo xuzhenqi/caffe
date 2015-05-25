@@ -767,6 +767,47 @@ class PReLULayer : public NeuronLayer<Dtype> {
   Blob<Dtype> bottom_memory_;  // memory for in-place computation
 };
 
+template <typename Dtype>
+class APLLayer : public NeuronLayer<Dtype> {
+ public:
+  explicit APLLayer(const LayerParameter& param)
+      : NeuronLayer<Dtype>(param) {}
+
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "APL"; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+	int M_;
+	int N_;
+	int K_;
+
+	int sums_;
+
+  Blob<Dtype> inPlace_memory_;
+
+	bool save_mem_;
+
+  // For backprop
+  shared_ptr<SyncedMemory> example_multiplier_;
+  shared_ptr<SyncedMemory> temp_ex_neuron_sum_;
+  shared_ptr<SyncedMemory> maxs_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_NEURON_LAYERS_HPP_

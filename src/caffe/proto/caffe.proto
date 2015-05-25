@@ -88,7 +88,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 36 (last added: clip_gradients)
+// SolverParameter next available ID: 41 (last added: momentum_change_steps)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -153,6 +153,14 @@ message SolverParameter {
   optional int32 stepsize = 13;
   // the stepsize for learning rate policy "multistep"
   repeated int32 stepvalue = 34;
+
+	// For doing preset learning rate
+	repeated float lr = 36;
+	repeated float lr_change = 37;
+
+	optional float max_momentum = 38 [default = 0.9];
+	optional float momentum_change = 39 [default = 500];
+	optional uint32 momentum_change_steps = 40 [default = 0];
 
   // Set clip_gradients to >= 0 to clip parameter gradients to that L2 norm,
   // whenever their actual L2 norm is larger.
@@ -259,7 +267,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 133 (last added: perturbation_param)
+// LayerParameter next available layer-specific ID: 133 (last added: APLParameter)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -333,6 +341,7 @@ message LayerParameter {
   optional TanHParameter tanh_param = 127;
   optional ThresholdParameter threshold_param = 128;
   optional WindowDataParameter window_data_param = 129;
+	optional APLParameter apl_param = 133;
 }
 
 // Message that stores parameters used to apply transformation
@@ -386,6 +395,12 @@ message ArgMaxParameter {
   // If true produce pairs (argmax, maxval)
   optional bool out_max_val = 1 [default = false];
   optional uint32 top_k = 2 [default = 1];
+}
+
+// Message that stores parameters used by BNLayer
+message BNParameter {
+	optional FillerParameter scale_filler = 1; // The filler for the scale
+	optional FillerParameter shift_filler = 2; // The filler for the shift
 }
 
 // Message that stores parameters used by ConcatLayer
@@ -790,6 +805,7 @@ message V1LayerParameter {
     NONE = 0;
     ABSVAL = 35;
     ACCURACY = 1;
+    APL = 40;
     ARGMAX = 30;
     BNLL = 2;
     CONCAT = 3;
@@ -975,4 +991,15 @@ message PReLUParameter {
   optional FillerParameter filler = 1;
   // Whether or not slope paramters are shared across channels.
   optional bool channel_shared = 2 [default = false];
+}
+
+// Message that stores parameters used by APLLayer
+message APLParameter {
+  // Adaptive Piecewise Linear (APL) Unit described in 
+	// Agostinelli et al, Learning Activation Functions to Improve Deep Neural Networks
+
+  optional uint32 sums = 1 [default = 2];
+  optional FillerParameter slope_filler = 2; //controls slope. Usually random uniform between -0.5 and 0.5. Should decrease and number of sums increases
+  optional FillerParameter offset_filler = 3; // controls offset. Usually gaussian with std 0.5 
+	optional bool save_mem = 4 [default = false];
 }
