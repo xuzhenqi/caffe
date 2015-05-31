@@ -214,6 +214,7 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   }
   GetLearningRateAndWeightDecay();
   debug_info_ = param.debug_info();
+  LOG(INFO) << "debug_info: " << debug_info_;
   LOG(INFO) << "Network initialization done.";
   LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
 }
@@ -473,7 +474,9 @@ Dtype Net<Dtype>::ForwardFromTo(int start, int end) {
     layers_[i]->Reshape(bottom_vecs_[i], top_vecs_[i]);
     Dtype layer_loss = layers_[i]->Forward(bottom_vecs_[i], top_vecs_[i]);
     loss += layer_loss;
-    if (debug_info_) { ForwardDebugInfo(i); }
+    if (debug_info_) { 
+      ForwardDebugInfo(i); 
+    }
   }
   return loss;
 }
@@ -571,6 +574,7 @@ void Net<Dtype>::ForwardDebugInfo(const int layer_id) {
        << "Layer " << layer_names_[layer_id] << ", param blob " << blob_name
        << " data: " << data_abs_val_mean;
   }
+  layers_[layer_id]->DebugInfo();
 }
 
 template <typename Dtype>

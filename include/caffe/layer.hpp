@@ -284,7 +284,11 @@ class Layer {
     }
     param_propagate_down_[param_id] = value;
   }
-
+ 
+  /**
+   * @brief Display debug info for specified layer
+   */
+  virtual inline void DebugInfo() {} 
 
  protected:
   /** The protobuf that stores the layer parameters */

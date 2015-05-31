@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <string>
+#include <fstream>
 
 #include "google/protobuf/message.h"
 #include "hdf5.h"
@@ -17,6 +18,20 @@
 namespace caffe {
 
 using ::google::protobuf::Message;
+
+template <class Dtype>
+inline void DumpMatrixToTxt(const char* file_name, const int N, const Dtype* vec, 
+                            const vector<int>& shape){
+  std::ofstream ofs(file_name);
+  for (int i=0; i<shape.size(); ++i){
+    ofs << shape[i] << " ";
+  }
+  //ofs << std::endl;
+  for (int i=0; i<N; ++i)
+    ofs << vec[i] << " ";
+  ofs << std::endl;
+  ofs.flush();
+}
 
 inline void MakeTempFilename(string* temp_filename) {
   temp_filename->clear();
