@@ -126,6 +126,30 @@ void caffe_cpu_axpby<double>(const int N, const double alpha, const double* X,
   cblas_daxpby(N, alpha, X, 1, beta, Y, 1);
 }
 
+template <typename Dtype>
+void caffe_cpu_max(const int n, const Dtype* a, const Dtype b, Dtype* y) {
+  for (int i = 0; i < n; ++i){
+    y[i] = std::max(a[i], b);
+  }
+}
+
+template void 
+caffe_cpu_max<float>(const int n, const float* a, const float b, float* y);
+template void
+caffe_cpu_max<double>(const int n, const double* a, const double b, double* y);
+
+template <typename Dtype>
+void caffe_cpu_max(const int n, const Dtype* a, const Dtype* b, Dtype* y) {
+  for (int i = 0; i < n; ++i){
+    y[i] = std::max(a[i], b[i]);
+  }
+}
+
+template void 
+caffe_cpu_max<float>(const int n, const float* a, const float* b, float* y);
+template void
+caffe_cpu_max<double>(const int n, const double* a, const double* b, double* y);
+
 template <>
 void caffe_add<float>(const int n, const float* a, const float* b,
     float* y) {

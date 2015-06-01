@@ -47,6 +47,12 @@ template <typename Dtype>
 void caffe_add_scalar(const int N, const Dtype alpha, Dtype *X);
 
 template <typename Dtype>
+void caffe_cpu_max(const int, const Dtype*, const Dtype, Dtype*);
+
+template <typename Dtype>
+void caffe_cpu_max(const int, const Dtype*, const Dtype*, Dtype*);
+
+template <typename Dtype>
 void caffe_scal(const int N, const Dtype alpha, Dtype *X);
 
 template <typename Dtype>

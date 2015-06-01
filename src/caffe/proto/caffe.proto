@@ -1008,5 +1008,6 @@ message APLParameter {
 
   optional float layer_weight_decay = 5 [default = 0.001]; // Used for special regularization for APL layers
 
-  optional string slope_regular_type = 6 [default = 'L2']; // Could be one of ['L2', 'Variance'] 
+  optional string slope_regular_type = 6 [default = 'L2']; // Could be one of ['L2', 'Variance']
+  optional float slope_sum_constrains = 7; // Whether to constrain the sum of slopes to be a constant.
 }

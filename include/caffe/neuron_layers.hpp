@@ -791,16 +791,36 @@ class APLLayer : public NeuronLayer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  void Forward_cpu_v1(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  void Forward_gpu_v1(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  void Backward_cpu_v1(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  void Backward_gpu_v1(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  void Forward_cpu_v2(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  void Forward_gpu_v2(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  void Backward_cpu_v2(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  void Backward_gpu_v2(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   void Variance_regularise(const Dtype* weight);
   void L2_regularise(const Dtype* weight);
   void Variance_regularise_gpu(const Dtype* weight);
   void L2_regularise_gpu(const Dtype* weight);
+
 
 	int M_;
 	int N_;
 	int K_;
 
 	int sums_;
+  int slope_num; // the number of slopes
 
   Blob<Dtype> inPlace_memory_;
 
@@ -815,6 +835,9 @@ class APLLayer : public NeuronLayer<Dtype> {
   Blob<Dtype> temp1_;
   Blob<Dtype> temp2_;
   Blob<Dtype> ones_;
+
+  // For slope constrains
+  Blob<Dtype> slope_last;
 };
 
 }  // namespace caffe

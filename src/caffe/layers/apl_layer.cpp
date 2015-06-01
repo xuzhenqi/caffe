@@ -32,7 +32,13 @@ template <typename Dtype>
 		N_ = K_;
 
 		sums_ = this->layer_param_.apl_param().sums();
+    slope_num = sums_;
 		save_mem_ = this->layer_param_.apl_param().save_mem();
+
+    if (this->layer_param_.apl_param().has_slope_sum_constrains()) {
+      --slope_num;
+      slope_last.Reshape(1, 1, 1, K_);
+    }
 
 		// Check if we need to set up the weights
 		if (this->blobs_.size() > 0) {
@@ -69,7 +75,7 @@ template <typename Dtype>
 			//		this->layer_param_.apl_param().offset_filler()));
 
 			//slope
-			this->blobs_[0].reset(new Blob<Dtype>(1, 1, sums_, K_));
+			this->blobs_[0].reset(new Blob<Dtype>(1, 1, slope_num, K_));
 			CHECK(this->blobs_[0].get()->count());
 			slope_filler->Fill(this->blobs_[0].get());
 
@@ -103,22 +109,30 @@ template <typename Dtype>
 			<< "Number of axes of bottom blob must be >=2.";
 		top[0]->ReshapeLike(*bottom[0]);
 
-		if (bottom[0] == top[0]) {
-			// For in-place computation
-			inPlace_memory_.ReshapeLike(*bottom[0]);
-		}
+		inPlace_memory_.ReshapeLike(*bottom[1]);
 
     if(this->layer_param_.apl_param().layer_weight_decay() > 1e-9){
-      temp1_.ReshapeLike(*(this->blobs_[0]));
-      temp2_.ReshapeLike(*(this->blobs_[0]));
+      temp1_.ReshapeLike(*(this->blobs_[1]));
+      temp2_.ReshapeLike(*(this->blobs_[1]));
       ones_.Reshape(1, 1, sums_, K_);
       caffe_set(ones_.count(), Dtype(1), ones_.mutable_cpu_data());
     }
 	}
 
 template <typename Dtype>
-	void APLLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+void APLLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+          const vector<Blob<Dtype>*>& top){
+    if (this->layer_param_.apl_param().has_slope_sum_constrains()) {
+      Forward_cpu_v2(bottom, top);
+    } else {
+      this->Forward_cpu_v1(bottom, top);
+    }
+}
+
+template <typename Dtype>
+	void APLLayer<Dtype>::Forward_cpu_v1(const vector<Blob<Dtype>*>& bottom,
 			const vector<Blob<Dtype>*>& top) {
+
 		/* Initialize */
 		const Dtype* bottom_data = bottom[0]->cpu_data();
 		Dtype* top_data = top[0]->mutable_cpu_data();
@@ -152,7 +166,83 @@ template <typename Dtype>
 	}
 
 template <typename Dtype>
-	void APLLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+void APLLayer<Dtype>::Forward_cpu_v2(const vector<Blob<Dtype>*>& bottom,
+        const vector<Blob<Dtype>*>& top){
+	/* Initialize */
+	const Dtype* bottom_data = bottom[0]->cpu_data();
+	Dtype* top_data = top[0]->mutable_cpu_data();
+
+	const Dtype* neuron_weight = this->blobs_[0]->cpu_data();
+	const Dtype* neuron_offset = this->blobs_[1]->cpu_data();
+	const int count = bottom[0]->count();
+  
+  // Compute the last slope 
+  caffe_set(slope_last.count(), Dtype(0.), slope_last.mutable_cpu_data());
+  for (int i=0; i<slope_num; ++i){
+    caffe_sub(slope_last.count(), slope_last.cpu_data(), neuron_weight+i*K_, 
+              slope_last.mutable_cpu_data());
+  }
+  
+  caffe_copy(count, bottom_data, inPlace_memory_.mutable_cpu_data());
+  
+  caffe_cpu_max(count, inPlace_memory_.cpu_data(), Dtype(0.), top_data);
+
+  for(int i=0; i<sums_; ++i){
+    for(int j=0; j<M_; ++j){
+      caffe_sub(K_, neuron_weight+i*K_, inPlace_memory_.cpu_data()+j*K_,
+                    temp1_.mutable_cpu_data() + j*K_);
+      if (i == slope_num){
+        caffe_mul(K_, temp1_.cpu_data()+j*K_, slope_last.cpu_data(),
+                      temp1_.mutable_cpu_data());
+      } else {
+        caffe_mul(K_, temp1_.cpu_data()+j*K_, neuron_weight+j*K_,
+                      temp1_.mutable_cpu_data());
+      }
+    }
+    caffe_cpu_max(count, temp1_.cpu_data(), Dtype(0), 
+                  temp1_.mutable_cpu_data());
+    caffe_add(count, top_data, temp1_.cpu_data(), top_data);
+  }
+}
+
+template <typename Dtype>
+void APLLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+			const vector<bool>& propagate_down,
+  		const vector<Blob<Dtype>*>& bottom) {
+  if (this->layer_param_.apl_param().has_slope_sum_constrains()) {
+    Backward_cpu_v2(bottom, propagate_down, top);
+  } else {
+    Backward_cpu_v1(bottom, propagate_down, top);
+  }
+	const Dtype* bottom_data = bottom[0]->cpu_data();
+	const Dtype* top_diff = top[0]->cpu_diff();
+	Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
+
+	const Dtype* neuron_weight = this->blobs_[0]->cpu_data();
+  const Dtype* neuron_offset = this->blobs_[1]->cpu_data();
+
+	Dtype* neuron_weight_diff = this->blobs_[0]->mutable_cpu_diff();
+	Dtype* neuron_offset_diff = this->blobs_[1]->mutable_cpu_diff();
+  // Regularise by variance of the weight across different APL units
+  if(this->layer_param_.apl_param().layer_weight_decay() > 1e-9){
+    string type = this->layer_param_.apl_param().slope_regular_type();
+    if (type == string("Variance")){
+      Variance_regularise(neuron_weight);
+    } else if (type == string("L2")){
+      L2_regularise(neuron_weight);
+    } else {
+      LOG(ERROR) << "Unsupported type: " << type 
+          << ". Should be one of [\"Variance\", \"L2\"]";
+    }
+    caffe_add(temp1_.count(), neuron_weight_diff, temp1_.cpu_data(),
+              neuron_weight_diff);
+    Variance_regularise(neuron_offset);
+    caffe_add(temp1_.count(), neuron_offset_diff, temp1_.cpu_data(),
+              neuron_offset_diff);
+  } 
+}
+template <typename Dtype>
+	void APLLayer<Dtype>::Backward_cpu_v1(const vector<Blob<Dtype>*>& top,
 			const vector<bool>& propagate_down,
 			const vector<Blob<Dtype>*>& bottom) {
 		/* Initialize */
@@ -205,25 +295,87 @@ template <typename Dtype>
 				}
 			}
 		}
-    // Regularise by variance of the weight across different APL units
-    if(this->layer_param_.apl_param().layer_weight_decay() > 1e-9){
-      string type = this->layer_param_.apl_param().slope_regular_type();
-      if (type == string("Variance")){
-        Variance_regularise(neuron_weight);
-      } else if (type == string("L2")){
-        L2_regularise(neuron_weight);
-      } else {
-        LOG(ERROR) << "Unsupported type: " << type 
-            << ". Should be one of [\"Variance\", \"L2\"]";
-      }
-      caffe_add(temp1_.count(), neuron_weight_diff, temp1_.cpu_data(),
-                neuron_weight_diff);
-      Variance_regularise(neuron_offset);
-      caffe_add(temp1_.count(), neuron_offset_diff, temp1_.cpu_data(),
-                neuron_offset_diff);
-    } 
 	
   }
+template <typename Dtype>
+void APLLayer<Dtype>::Backward_cpu_v2(const vector<Blob<Dtype>*>& top,
+			const vector<bool>& propagate_down,
+			const vector<Blob<Dtype>*>& bottom) {
+	/* Initialize */
+	const Dtype* bottom_data = bottom[0]->cpu_data();
+	const Dtype* top_diff = top[0]->cpu_diff();
+  const Dtype* top_data = top[0]->cpu_data();
+	Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
+
+	const Dtype* neuron_weight = this->blobs_[0]->cpu_data();
+  const Dtype* neuron_offset = this->blobs_[1]->cpu_data();
+
+	Dtype* neuron_weight_diff = this->blobs_[0]->mutable_cpu_diff();
+	Dtype* neuron_offset_diff = this->blobs_[1]->mutable_cpu_diff();
+  
+  // Computing neuron_weight_diff
+  caffe_set(slope_num*K_, Dtype(0.), neuron_weight_diff);
+
+  for (int i=0; i<M_; ++i){
+    caffe_sub(K_, neuron_offset+slope_num*K_, bottom_data+i*K_, 
+                  temp1_.mutable_cpu_data());
+    caffe_cpu_max(K_, temp1_.cpu_data(), Dtype(0.), temp1_.mutable_cpu_data());
+    for (int j=0; j<slope_num; ++j){
+      caffe_sub(K_, neuron_offset+j*K_, bottom_data+i*K_, 
+                    temp2_.mutable_cpu_data()+j*K_);
+      caffe_cpu_max(K_, temp2_.cpu_data()+j*K_, Dtype(0.),
+                    temp2_.mutable_cpu_data()+j*K_);
+      caffe_sub(K_, temp2_.cpu_data()+j*K_, temp1_.cpu_data(), 
+                    temp2_.mutable_cpu_data()+j*K_);
+      caffe_mul(K_, top_diff+i*K_, temp2_.cpu_data()+j*K_,
+                    temp2_.mutable_cpu_data()+j*K_);
+
+    }
+    caffe_add(slope_num*K_, temp2_.cpu_data(), neuron_weight_diff, 
+                  neuron_weight_diff);
+  }
+  
+  // Computing neuron_offset_diff
+  caffe_set(sums_*K_, Dtype(0.), neuron_offset_diff);
+  for (int i=0; i<M_; ++i){
+    for (int j=0; j<sums_; ++j){
+      caffe_cpu_sign(K_, bottom_data+i*K_, temp1_.mutable_cpu_data()+j*K_);
+      if (j==slope_num){
+        caffe_mul(K_, slope_last.cpu_data(), temp1_.cpu_data()+j*K_,
+                      temp1_.mutable_cpu_data()+j*K_);
+      } else {
+        caffe_mul(K_, neuron_weight+j*K_, temp1_.cpu_data()+j*K_,
+                  temp1_.mutable_cpu_data()+j*K_);
+      }
+      caffe_mul(K_, top_diff+i*K_, temp1_.cpu_data()+j*K_,
+                temp1_.mutable_cpu_data()+j*K_);
+    }
+    caffe_add(sums_*K_, temp1_.cpu_data(), neuron_offset_diff, 
+              neuron_offset_diff);
+  }
+
+  // Computing bottom_diff
+  for (int i=0; i<M_; ++i){
+    caffe_cpu_max(K_, bottom_data+i*K_, Dtype(0.), temp1_.mutable_cpu_data());
+    for(int j=0; j<sums_; ++j){
+      caffe_sub(K_, neuron_offset+j*K_, bottom_data+i*K_, 
+                    temp2_.mutable_cpu_data());
+      caffe_cpu_max(K_, temp2_.cpu_data(), Dtype(0.), 
+                    temp2_.mutable_cpu_data());
+      if (j == slope_num) {
+        caffe_mul(K_, temp2_.cpu_data(), slope_last.cpu_data(), 
+                      temp2_.mutable_cpu_data());
+      } else {
+        caffe_mul(K_, temp2_.cpu_data(), neuron_weight+j*K_,
+                      temp2_.mutable_cpu_data());
+      }
+      caffe_sub(K_, temp1_.cpu_data(), temp2_.cpu_data(), 
+                    temp1_.mutable_cpu_data());
+    }
+    caffe_mul(K_, top_diff+i*K_, temp1_.cpu_data(), bottom_diff+i*K_);
+  }
+
+}
 /**
  * Using temp1_ and temp2_ as buffer
  * The outcome will be stored in temp1_.cpu_data()
