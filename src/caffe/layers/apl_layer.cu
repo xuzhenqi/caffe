@@ -10,7 +10,11 @@
 #include "caffe/layer.hpp"
 #include "caffe/vision_layers.hpp"
 #include "caffe/util/math_functions.hpp"
+<<<<<<< HEAD
 #include "caffe/util/io.hpp"
+=======
+
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
 namespace caffe {
 
@@ -202,7 +206,10 @@ template <typename Dtype>
 
 		//Backprop apl weights
 		const Dtype* neuron_weight = this->blobs_[0]->gpu_data();
+<<<<<<< HEAD
     const Dtype* neuron_offset = this->blobs_[1]->gpu_data();
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
 		Dtype* neuron_weight_diff = this->blobs_[0]->mutable_gpu_diff();
 		Dtype* neuron_offset_diff = this->blobs_[1]->mutable_gpu_diff();
@@ -240,6 +247,7 @@ template <typename Dtype>
 				CUDA_POST_KERNEL_CHECK;
 			}
 		}
+<<<<<<< HEAD
     //static bool flag = false;
     // Regularise by variance of the weight across different APL units
     if(this->layer_param_.apl_param().layer_weight_decay() > 1e-9){
@@ -319,6 +327,10 @@ void APLLayer<Dtype>::L2_regularise_gpu(const Dtype* weight){
   caffe_gpu_axpby(temp1_.count(), weight_decay, weight, Dtype(0.), temp1_.mutable_gpu_data());
 }
 
+=======
+	}
+
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 INSTANTIATE_LAYER_GPU_FUNCS(APLLayer);
 
 }  // namespace caffe

@@ -9,7 +9,10 @@
 #include "caffe/vision_layers.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/syncedmem.hpp"
+<<<<<<< HEAD
 #include "caffe/util/io.hpp"
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 #include <ctime>
 #include <cstdio>
 #include <string.h>
@@ -32,6 +35,7 @@ template <typename Dtype>
 		N_ = K_;
 
 		sums_ = this->layer_param_.apl_param().sums();
+<<<<<<< HEAD
     slope_num = sums_;
 		save_mem_ = this->layer_param_.apl_param().save_mem();
 
@@ -40,6 +44,10 @@ template <typename Dtype>
       slope_last.Reshape(1, 1, 1, K_);
     }
 
+=======
+		save_mem_ = this->layer_param_.apl_param().save_mem();
+
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 		// Check if we need to set up the weights
 		if (this->blobs_.size() > 0) {
 			LOG(INFO) << "Skipping parameter initialization";
@@ -75,7 +83,11 @@ template <typename Dtype>
 			//		this->layer_param_.apl_param().offset_filler()));
 
 			//slope
+<<<<<<< HEAD
 			this->blobs_[0].reset(new Blob<Dtype>(1, 1, slope_num, K_));
+=======
+			this->blobs_[0].reset(new Blob<Dtype>(1, 1, sums_, K_));
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 			CHECK(this->blobs_[0].get()->count());
 			slope_filler->Fill(this->blobs_[0].get());
 
@@ -109,6 +121,7 @@ template <typename Dtype>
 			<< "Number of axes of bottom blob must be >=2.";
 		top[0]->ReshapeLike(*bottom[0]);
 
+<<<<<<< HEAD
 		inPlace_memory_.ReshapeLike(*bottom[1]);
 
     if(this->layer_param_.apl_param().layer_weight_decay() > 1e-9){
@@ -133,6 +146,17 @@ template <typename Dtype>
 	void APLLayer<Dtype>::Forward_cpu_v1(const vector<Blob<Dtype>*>& bottom,
 			const vector<Blob<Dtype>*>& top) {
 
+=======
+		if (bottom[0] == top[0]) {
+			// For in-place computation
+			inPlace_memory_.ReshapeLike(*bottom[0]);
+		}
+	}
+
+template <typename Dtype>
+	void APLLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+			const vector<Blob<Dtype>*>& top) {
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 		/* Initialize */
 		const Dtype* bottom_data = bottom[0]->cpu_data();
 		Dtype* top_data = top[0]->mutable_cpu_data();
@@ -166,6 +190,7 @@ template <typename Dtype>
 	}
 
 template <typename Dtype>
+<<<<<<< HEAD
 void APLLayer<Dtype>::Forward_cpu_v2(const vector<Blob<Dtype>*>& bottom,
         const vector<Blob<Dtype>*>& top){
 	/* Initialize */
@@ -243,6 +268,9 @@ void APLLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 }
 template <typename Dtype>
 	void APLLayer<Dtype>::Backward_cpu_v1(const vector<Blob<Dtype>*>& top,
+=======
+	void APLLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 			const vector<bool>& propagate_down,
 			const vector<Blob<Dtype>*>& bottom) {
 		/* Initialize */
@@ -251,7 +279,10 @@ template <typename Dtype>
 		Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
 
 		const Dtype* neuron_weight = this->blobs_[0]->cpu_data();
+<<<<<<< HEAD
     const Dtype* neuron_offset = this->blobs_[1]->cpu_data();
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
 		Dtype* neuron_weight_diff = this->blobs_[0]->mutable_cpu_diff();
 		Dtype* neuron_offset_diff = this->blobs_[1]->mutable_cpu_diff();
@@ -295,6 +326,7 @@ template <typename Dtype>
 				}
 			}
 		}
+<<<<<<< HEAD
 	
   }
 template <typename Dtype>
@@ -421,6 +453,9 @@ void APLLayer<Dtype>::L2_regularise(const Dtype* weight){
   Dtype weight_decay = this->layer_param_.apl_param().layer_weight_decay();
   caffe_cpu_axpby(temp1_.count(), weight_decay, weight, Dtype(0.), temp1_.mutable_cpu_data());
 }
+=======
+	}
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
 #ifdef CPU_ONLY
 STUB_GPU(APLLayer);

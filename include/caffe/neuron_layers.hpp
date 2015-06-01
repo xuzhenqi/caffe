@@ -791,6 +791,7 @@ class APLLayer : public NeuronLayer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+<<<<<<< HEAD
   void Forward_cpu_v1(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   void Forward_gpu_v1(const vector<Blob<Dtype>*>& bottom,
@@ -814,13 +815,18 @@ class APLLayer : public NeuronLayer<Dtype> {
   void Variance_regularise_gpu(const Dtype* weight);
   void L2_regularise_gpu(const Dtype* weight);
 
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
 	int M_;
 	int N_;
 	int K_;
 
 	int sums_;
+<<<<<<< HEAD
   int slope_num; // the number of slopes
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 
   Blob<Dtype> inPlace_memory_;
 
@@ -830,6 +836,7 @@ class APLLayer : public NeuronLayer<Dtype> {
   shared_ptr<SyncedMemory> example_multiplier_;
   shared_ptr<SyncedMemory> temp_ex_neuron_sum_;
   shared_ptr<SyncedMemory> maxs_;
+<<<<<<< HEAD
   
   // For backprop special regularization
   Blob<Dtype> temp1_;
@@ -838,6 +845,8 @@ class APLLayer : public NeuronLayer<Dtype> {
 
   // For slope constrains
   Blob<Dtype> slope_last;
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 };
 
 }  // namespace caffe

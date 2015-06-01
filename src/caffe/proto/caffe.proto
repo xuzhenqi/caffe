@@ -1005,9 +1005,12 @@ message APLParameter {
   optional FillerParameter slope_filler = 2; //controls slope. Usually random uniform between -0.5 and 0.5. Should decrease and number of sums increases
   optional FillerParameter offset_filler = 3; // controls offset. Usually gaussian with std 0.5 
 	optional bool save_mem = 4 [default = false];
+<<<<<<< HEAD
 
   optional float layer_weight_decay = 5 [default = 0.001]; // Used for special regularization for APL layers
 
   optional string slope_regular_type = 6 [default = 'L2']; // Could be one of ['L2', 'Variance']
   optional float slope_sum_constrains = 7; // Whether to constrain the sum of slopes to be a constant.
+=======
+>>>>>>> 28734762f6a5c2991edd63b1c79090a14fbca0b6
 }
