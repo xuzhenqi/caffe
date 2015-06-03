@@ -322,6 +322,25 @@ void caffe_gpu_max<double>(const int N, const double *a, double *y){
 }
 
 template <typename Dtype>
+__global__ void max_kernel(const int n, const Dtype* X, Dtype a, Dtype* Y) {
+  CUDA_KERNEL_LOOP(index, n) {
+    Y[index] = max(X[index], a);
+  }
+}
+
+template<>
+void caffe_gpu_max<float>(const int N, const float* a, float b, float *y){
+  max_kernel<float><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, a, b, y);
+}
+
+template<>
+void caffe_gpu_max<double>(const int N, const double* a, double b, double *y){
+  max_kernel<double><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, a, b, y);
+}
+
+template <typename Dtype>
 __global__ void exp_kernel(const int n, const Dtype* a, Dtype* y) {
   CUDA_KERNEL_LOOP(index, n) {
     y[index] = exp(a[index]);
@@ -460,5 +479,26 @@ void caffe_gpu_rng_gaussian(const int n, const double mu, const double sigma,
 }
 
 
+template <typename Dtype>
+__global__ void large_kernel(const int n, const Dtype* a, const Dtype b,
+     Dtype* y) {
+  CUDA_KERNEL_LOOP(index, n) {
+    y[index] = Dtype(a[index] > b);
+  }
+}
+
+// return Y[i] = X[i] > a
+template <> void caffe_gpu_large(const int N, const float* X, const float a, 
+                     float* Y) {
+  large_kernel<float><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, X, a, Y);
+}
+
+// return Y[i] = X[i] > a
+template <> void caffe_gpu_large(const int N, const double* X, const double a, 
+                     double* Y) {
+  large_kernel<double><<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+      N, X, a, Y);
+}
 
 }  // namespace caffe

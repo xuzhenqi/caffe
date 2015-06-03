@@ -46,6 +46,11 @@ inline void caffe_memset(const size_t N, const int alpha, void* X) {
 template <typename Dtype>
 void caffe_add_scalar(const int N, const Dtype alpha, Dtype *X);
 
+// return Y[i] = X[i] > a
+template <typename Dtype>
+void caffe_cpu_large(const int N, const Dtype* X, const Dtype a, 
+                     Dtype* Y);
+
 template <typename Dtype>
 void caffe_cpu_max(const int, const Dtype*, const Dtype, Dtype*);
 
@@ -182,6 +187,9 @@ void caffe_gpu_set(const int N, const Dtype alpha, Dtype *X);
 template <typename Dtype>
 void caffe_gpu_max(const int N, const Dtype *X, Dtype *Y);
 
+template <typename Dtype>
+void caffe_gpu_max(const int N, const Dtype* X, Dtype a, Dtype* Y);
+
 inline void caffe_gpu_memset(const size_t N, const int alpha, void* X) {
 #ifndef CPU_ONLY
   CUDA_CHECK(cudaMemset(X, alpha, N));  // NOLINT(caffe/alt_fn)
@@ -257,6 +265,11 @@ void caffe_gpu_fabs(const int n, const Dtype* x, Dtype* y);
 
 template <typename Dtype>
 void caffe_gpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
+
+// return Y[i] = X[i] > a
+template <typename Dtype>
+void caffe_gpu_large(const int N, const Dtype* X, const Dtype a, 
+                     Dtype* Y);
 
 #define DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(name, operation) \
 template<typename Dtype> \

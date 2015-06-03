@@ -17,7 +17,7 @@ void CombineLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   up_.clear();
   down_.clear();
   for(int i=0; i<size; ++i){
-    const CombineParameter &pp = this->layer_param_.combine_param(i);
+    const PartitionParameter &pp = this->layer_param_.combine_param(i);
     left_.push_back(pp.left());
     right_.push_back(pp.right());
     up_.push_back(pp.up());
@@ -99,8 +99,8 @@ void CombineLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       for (k = 0; k < C; ++k){
         for (l = up_[i]; l < down_[i]; ++l){
           caffe_copy(right_[i] - left_[i], 
-                     top_diff + j*C*H*W + k*H*W + l*W + left_[i]);
-                     bottom_diff + j*C*tH*tW + k*tH*tW + (l-up_[i])*tW,
+                     top_diff + j*C*H*W + k*H*W + l*W + left_[i],
+                     bottom_diff + j*C*tH*tW + k*tH*tW + (l-up_[i])*tW);
         }
       }
     }

@@ -809,10 +809,10 @@ class APLLayer : public NeuronLayer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   void Backward_gpu_v2(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  void Variance_regularise(const Dtype* weight);
-  void L2_regularise(const Dtype* weight);
-  void Variance_regularise_gpu(const Dtype* weight);
-  void L2_regularise_gpu(const Dtype* weight);
+  void Variance_regularise(const int M, const int N, const Dtype* weight);
+  void L2_regularise(const int count, const Dtype* weight);
+  void Variance_regularise_gpu(const int M, const int N, const Dtype* weight);
+  void L2_regularise_gpu(const int count, const Dtype* weight);
 
 	int M_;
 	int N_;
@@ -831,9 +831,10 @@ class APLLayer : public NeuronLayer<Dtype> {
   shared_ptr<SyncedMemory> maxs_;
   
   // For backprop special regularization
-  Blob<Dtype> temp1_;
-  Blob<Dtype> temp2_;
-  Blob<Dtype> ones_;
+  Blob<Dtype> temp1_; // shape like blobs_[1]
+  Blob<Dtype> temp2_; // shape like blobs_[1]
+  Blob<Dtype> ones_;  // all ones. shape like blobs_[1]
+  Blob<Dtype> temp3_; // shape like bottom[0]
 
   // For slope constrains
   Blob<Dtype> slope_last;

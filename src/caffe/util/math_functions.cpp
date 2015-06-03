@@ -9,6 +9,18 @@
 
 namespace caffe {
 
+template <typename Dtype>
+void caffe_cpu_large(const int N, const Dtype* X, const Dtype a, Dtype* Y) {
+  for (int i = 0; i < N; ++i){
+    Y[i] = Dtype(X[i] > a);
+  }
+}
+
+template void 
+caffe_cpu_large<float>(const int, const float*, const float, float*);
+template void 
+caffe_cpu_large<double>(const int, const double*, const double, double*);
+
 template<>
 void caffe_cpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
