@@ -92,9 +92,9 @@ void CombineLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   int i, j, k, l;
   int tH, tW;
   for (i = 0; i < left_.size(); ++i){
-    bottom_diff = top[i]->mutable_cpu_diff();
-    tH = top[i]->height();
-    tW = top[i]->width();
+    bottom_diff = bottom[i]->mutable_cpu_diff();
+    tH = bottom[i]->height();
+    tW = bottom[i]->width();
     for (j = 0; j < N; ++j){
       for (k = 0; k < C; ++k){
         for (l = up_[i]; l < down_[i]; ++l){
