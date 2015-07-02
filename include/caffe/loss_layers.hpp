@@ -126,6 +126,36 @@ class LossLayer : public Layer<Dtype> {
 };
 
 /**
+ * @brief Computes the multi-reconstruction loss @f@
+ * 
+ */
+template <typename Dtype>
+class MultiConstructionLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit MultiConstructionLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual inline const char* type() const {return "MultiConstructionLoss"; }
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top); 
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top){ NOT_IMPLEMENTED; }
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom)
+  { NOT_IMPLEMENTED; }
+ private:
+  Blob<Dtype> gap_;
+  Blob<Dtype> inner_; 
+  Blob<Dtype> temp_; // used as temp buffer. 
+  Blob<Dtype> ones_;
+  Dtype alpha_;
+};
+
+/**
  * @brief Computes the contrastive loss @f$
  *          E = \frac{1}{2N} \sum\limits_{n=1}^N \left(y\right) d +
  *              \left(1-y\right) \max \left(margin-d, 0\right)

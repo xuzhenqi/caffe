@@ -475,11 +475,12 @@ void SGDSolver<Dtype>::ComputeUpdateValue() {
       this->net_->params_weight_decay();
   // get the learning rate
   Dtype rate = GetLearningRate();
+  Dtype momentum = this->param_.momentum();
   if (this->param_.display() && this->iter_ % this->param_.display() == 0) {
     LOG(INFO) << "Iteration " << this->iter_ << ", lr = " << rate;
+    LOG(INFO) << "Iteration " << this->iter_ << ", momentum = " << momentum;
   }
   ClipGradients();
-  Dtype momentum = this->param_.momentum();
   Dtype weight_decay = this->param_.weight_decay();
   string regularization_type = this->param_.regularization_type();
   switch (Caffe::mode()) {
