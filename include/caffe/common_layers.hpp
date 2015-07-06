@@ -15,59 +15,88 @@
 
 namespace caffe {
 
+/**
+ * @brief Sample one element each num elements
+ *
+ */
+template <typename Dtype>
+class SampleLayer : public Layer<Dtype> {
+ public:
+  explicit SampleLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
 
-  /**
-  * @brief Batch Normalization per-channel with scale & shift linear transform.
-  *
-  */
-  template <typename Dtype>
-  class BNLayer : public Layer<Dtype> {
-   public:
-    explicit BNLayer(const LayerParameter& param)
-        : Layer<Dtype>(param) {}
-    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-        const vector<Blob<Dtype>*>& top);
+  virtual inline const char* type() const { return "Sample"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactTopBlobs() const { return 1; }
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-        const vector<Blob<Dtype>*>& top);
+  int num_;
+};
 
-    virtual inline const char* type() const { return "BN"; }
-    virtual inline int ExactNumBottomBlobs() const { return 1; }
-    virtual inline int ExactNumTopBlobs() const { return 1; }
+/**
+* @brief Batch Normalization per-channel with scale & shift linear transform.
+*
+*/
+template <typename Dtype>
+class BNLayer : public Layer<Dtype> {
+ public:
+  explicit BNLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
 
-   protected:
-    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-        const vector<Blob<Dtype>*>& top);
-    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-        const vector<Blob<Dtype>*>& top);
-    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-        const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-    virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-        const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
 
-    // spatial mean & variance
-    Blob<Dtype> spatial_mean_, spatial_variance_;
-    // batch mean & variance
-    Blob<Dtype> batch_mean_, batch_variance_;
-    // buffer blob
-    Blob<Dtype> buffer_blob_;
+  virtual inline const char* type() const { return "BN"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
 
-    Blob<Dtype> x_norm_;
-    // x_sum_multiplier is used to carry out sum using BLAS
-    Blob<Dtype> spatial_sum_multiplier_, batch_sum_multiplier_;
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-    // dimension
-    int N_;
-    int C_;
-    int H_;
-    int W_;
-    // eps
-    Dtype var_eps_;
-	
-	Dtype decay_;
-	
-	bool moving_average_;
-  };
+  // spatial mean & variance
+  Blob<Dtype> spatial_mean_, spatial_variance_;
+  // batch mean & variance
+  Blob<Dtype> batch_mean_, batch_variance_;
+  // buffer blob
+  Blob<Dtype> buffer_blob_;
+
+  Blob<Dtype> x_norm_;
+  // x_sum_multiplier is used to carry out sum using BLAS
+  Blob<Dtype> spatial_sum_multiplier_, batch_sum_multiplier_;
+
+  // dimension
+  int N_;
+  int C_;
+  int H_;
+  int W_;
+  // eps
+  Dtype var_eps_;
+
+  Dtype decay_;
+
+  bool moving_average_;
+};
 
 /**
  * @brief Compute the index of the @f$ K @f$ max values for each datum across
@@ -587,6 +616,61 @@ class CombineLayer : public Layer<Dtype> {
   vector<int> right_;
   vector<int> up_;
   vector<int> down_;
+};
+
+/**
+ * @brief Long-short term memory layer.
+ * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ */
+template <typename Dtype>
+class LstmLayer : public Layer<Dtype> {
+ public:
+  explicit LstmLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "Lstm"; }
+  virtual bool IsRecurrent() const { return true; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  int I_; // input dimension
+  int H_; // num of hidden units
+  int T_; // length of sequence
+  int N_; // batch size
+  
+  Dtype clipping_threshold_; // threshold for clipped gradient
+  
+  Blob<Dtype> bias_multiplier_;
+  Blob<Dtype> clip_multiplier_;
+
+  Blob<Dtype> top_;
+  Blob<Dtype> pre_gate_;  // gate values before nonlinearity
+  Blob<Dtype> gate_;      // gate values after nonlinearity
+  Blob<Dtype> cell_;      // memory cell
+  Blob<Dtype> tanh_cell_; // tanh(memory cell)
+  Blob<Dtype> clip_mask_; // mask for sequence clipping
+
+  Blob<Dtype> c_0_; // previous cell state value
+  Blob<Dtype> h_0_; // previous hidden activation value
+  Blob<Dtype> c_T_; // next cell state value
+  Blob<Dtype> h_T_; // next hidden activation value
+
+  // intermediate values
+  Blob<Dtype> fdc_;
+  Blob<Dtype> ig_;
+  Blob<Dtype> clipped_;
 };
 
 }  // namespace caffe
