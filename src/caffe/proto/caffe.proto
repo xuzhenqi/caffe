@@ -267,7 +267,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 140 (last added: sample_param)
+// LayerParameter next available layer-specific ID: 141 (last added: l2n_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -328,6 +328,7 @@ message LayerParameter {
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
+  optional L2NParameter l2n_param = 140;
   optional LRNParameter lrn_param = 118;
   optional LSTMParameter lstm_param = 138;
   optional MemoryDataParameter memory_data_param = 119;
@@ -348,6 +349,13 @@ message LayerParameter {
   optional TanHParameter tanh_param = 127;
   optional ThresholdParameter threshold_param = 128;
   optional WindowDataParameter window_data_param = 129;
+}
+
+// Message that stores parameters used by L2NParameter
+// L2NParameter is L2Normalization layer used in FaceNet
+// Reference: FaceNet: A Unified Embedding for Face Recognition and Clustering.
+message L2NParameter {
+  optional float eps = 1 [default = 1e-5];
 }
 
 // Message that stores parameters used by SampleParameter
@@ -847,7 +855,6 @@ message V1LayerParameter {
     NONE = 0;
     ABSVAL = 35;
     ACCURACY = 1;
-    APL = 40;
     ARGMAX = 30;
     BNLL = 2;
     CONCAT = 3;

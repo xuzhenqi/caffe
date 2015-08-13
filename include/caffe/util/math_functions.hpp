@@ -64,6 +64,13 @@ template <typename Dtype>
 void caffe_sqr(const int N, const Dtype* a, Dtype* y);
 
 template <typename Dtype>
+void caffe_sqrt(const int N, const Dtype* a, Dtype* y);
+
+// y = a ^ 3
+template <typename Dtype>
+void caffe_cub(const int N, const Dtype* a, Dtype* y);
+
+template <typename Dtype>
 void caffe_add(const int N, const Dtype* a, const Dtype* b, Dtype* y);
 
 template <typename Dtype>
@@ -274,6 +281,18 @@ void caffe_gpu_asum(const int n, const Dtype* x, Dtype* y);
 
 template<typename Dtype>
 void caffe_gpu_sign(const int n, const Dtype* x, Dtype* y);
+
+// y = x * x
+template<typename Dtype>
+void caffe_gpu_sqr(const int n, const Dtype* x, Dtype* y);
+
+// y = sqrt(x)
+template<typename Dtype>
+void caffe_gpu_sqrt(const int n, const Dtype* x, Dtype* y);
+
+// y = x * x * x
+template<typename Dtype>
+void caffe_gpu_cub(const int n, const Dtype* x, Dtype* y);
 
 template<typename Dtype>
 void caffe_gpu_sgnbit(const int n, const Dtype* x, Dtype* y);

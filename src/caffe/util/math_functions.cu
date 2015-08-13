@@ -505,6 +505,13 @@ DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(sign, y[index] = (Dtype(0) < x[index])
                                       - (x[index] < Dtype(0)));
 DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(sgnbit, y[index] = signbit(x[index]));
 
+DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(sqr, y[index] = x[index] * x[index]);
+
+DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(sqrt, y[index] = sqrt(x[index]));
+
+DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(cub, 
+                       y[index] = x[index] * x[index] * x[index]);
+
 __global__ void popc_kernel(const int n, const float* a,
     const float* b, uint8_t* y) {
   CUDA_KERNEL_LOOP(index, n) {
