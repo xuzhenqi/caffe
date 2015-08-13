@@ -795,6 +795,43 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
   int softmax_axis_, outer_num_, inner_num_;
 };
 
+/**
+ * @brief Computes the triplet loss
+ */
+template <typename Dtype>
+class TripletLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit TripletLossLayer(const LayerParameter &param)
+      : LossLayer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                          const vector<Blob<Dtype>*> &top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline int ExactNumBottomBlobs() const {return 3; }
+  virtual inline bool AllowForceBackward(const int bottom_index) const {
+    return true;
+  }
+  virtual inline const char* type() const {return "TripletLoss"; }
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top); 
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  Dtype margin_;
+  int num_;
+  int dim_;
+  Blob<Dtype> p_sub_a_; // positive substract anchor;
+  Blob<Dtype> a_sub_n_; // anchor substract negative;
+  Blob<Dtype> temp_;
+};
+
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_

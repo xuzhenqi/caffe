@@ -29,8 +29,8 @@ class L2NLayerTest: public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;
  protected:
   L2NLayerTest() {
-    blob_bottom_vec_.push_back(new Blob<Dtype>(10, 3, 10, 10));
-    blob_top_vec_.push_back(new Blob<Dtype>(10, 3, 10, 10));
+    blob_bottom_vec_.push_back(new Blob<Dtype>(5, 3, 5, 5));
+    blob_top_vec_.push_back(new Blob<Dtype>(5, 3, 5, 5));
     FillerParameter filler_param;
     filler_param.set_min(-5.0);
     filler_param.set_max(5.0);
@@ -56,8 +56,8 @@ TYPED_TEST(L2NLayerTest,TestForward) {
   // manually compute to compare
   const Dtype *bottom = this->blob_bottom_vec_[0]->cpu_data(); 
   const Dtype *top = this->blob_top_vec_[0]->cpu_data();
-  int num = 10;
-  int dim = 300;
+  int num = 5;
+  int dim = 75;
   Dtype sum;
   for (int i = 0; i < num; ++i) {
     sum = 0;
