@@ -29,6 +29,13 @@ using google::protobuf::io::ZeroCopyOutputStream;
 using google::protobuf::io::CodedOutputStream;
 using google::protobuf::Message;
 
+void ShowImage(cv::Mat &img, const char *window_name = "temp", 
+               const char *img_name = "temp") {
+  cv::namedWindow(window_name);
+  cv::imshow(img_name, img);
+  cv::waitKey(5000); // wait key for 5000 ms.
+}
+
 bool ReadProtoFromTextFile(const char* filename, Message* proto) {
   int fd = open(filename, O_RDONLY);
   CHECK_NE(fd, -1) << "File not found: " << filename;
@@ -302,5 +309,7 @@ void hdf5_save_nd_dataset<double>(
       file_id, dataset_name.c_str(), HDF5_NUM_DIMS, dims, blob.cpu_data());
   CHECK_GE(status, 0) << "Failed to make double dataset " << dataset_name;
 }
+
+
 
 }  // namespace caffe

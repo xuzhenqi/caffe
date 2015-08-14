@@ -49,7 +49,7 @@ class BaseDataLayer : public Layer<Dtype> {
  protected:
   TransformationParameter transform_param_;
   shared_ptr<DataTransformer<Dtype> > data_transformer_;
-  bool output_labels_;
+  bool output_labels_; //
 };
 
 template <typename Dtype>
@@ -242,6 +242,38 @@ class ImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
 
   vector<std::pair<std::string, int> > lines_;
   int lines_id_;
+};
+
+template <typename Dtype>
+class TripletImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
+ public:
+  explicit TripletImageDataLayer(const LayerParameter &param)
+      : BasePrefetchingDataLayer<Dtype>(param) {}
+  virtual ~TripletImageDataLayer();
+  virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                          const vector<Blob<Dtype>*> &top);
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                              const vector<Blob<Dtype>*> &top);
+
+  virtual inline const char* type() const { return "TripletImageData"; }
+  virtual inline int ExactNumTopBlobs() const { return 3; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  inline const vector<int> &label_size() { return label_size_; }
+  inline const vector<string> &lines() { return lines_; }
+  inline const vector<int> &labels() { return labels_; }
+  void GetIndexs(vector<vector<int> > &indexs);
+ protected:
+  virtual void InternalThreadEntry();
+  vector<int> label_size_;
+  vector<string> lines_; 
+  vector<int> labels_;
+  vector<Blob<Dtype>*> prefetch_data_;
 };
 
 /**

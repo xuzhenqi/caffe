@@ -4,6 +4,10 @@
 #include <unistd.h>
 #include <string>
 #include <fstream>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/highgui/highgui_c.h>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include "google/protobuf/message.h"
 #include "hdf5.h"
@@ -18,6 +22,8 @@
 namespace caffe {
 
 using ::google::protobuf::Message;
+
+void ShowImage(const char *window_name, cv::Mat &img);
 
 template <class Dtype>
 inline void DumpMatrixToTxt(const char* file_name, const int N, const Dtype* vec, 
