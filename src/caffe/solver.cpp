@@ -126,6 +126,7 @@ void Solver<Dtype>::InitTestNets() {
           &net_params[test_net_id]);
   }
   const int remaining_test_nets = param_.test_iter_size() - test_net_id;
+  // A solver cannot specify both net and net_file fields.
   if (has_net_param) {
     for (int i = 0; i < remaining_test_nets; ++i, ++test_net_id) {
       sources[test_net_id] = "net_param";

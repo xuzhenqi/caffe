@@ -18,6 +18,9 @@ template <typename Dtype>
 void L2NLayer<Dtype>::Reshape(
     const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top){
+  if (top[0] == bottom[0]) {
+    LOG(FATAL) << "L2NLayer doesn't support in-place computation.";
+  }
   top[0]->ReshapeLike(*bottom[0]);
   temp_.ReshapeLike(*bottom[0]);
   num_ = bottom[0]->num();
@@ -25,7 +28,11 @@ void L2NLayer<Dtype>::Reshape(
   norm_.Reshape(num_, 1, 1, 1);
   multiplier_.Reshape(dimension_, 1, 1, 1);
   if (Caffe::mode() == Caffe::GPU) {
+#ifndef CPU_ONLY
     caffe_gpu_set(dimension_, Dtype(1), multiplier_.mutable_gpu_data());
+#else
+    NO_GPU;
+#endif
   } else {
     caffe_set(dimension_, Dtype(1), multiplier_.mutable_cpu_data());
   }

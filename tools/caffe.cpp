@@ -246,21 +246,27 @@ int time() {
   std::vector<double> backward_time_per_layer(layers.size(), 0.0);
   double forward_time = 0.0;
   double backward_time = 0.0;
+  LOG(INFO) << "timer init";
   for (int j = 0; j < FLAGS_iterations; ++j) {
+    LOG(INFO) << "iter " << j;
     Timer iter_timer;
     iter_timer.Start();
     forward_timer.Start();
+    LOG(INFO) << "Forward ";
     for (int i = 0; i < layers.size(); ++i) {
+      LOG(INFO) << "layer " << i;
       timer.Start();
       // Although Reshape should be essentially free, we include it here
       // so that we will notice Reshape performance bugs.
-      layers[i]->Reshape(bottom_vecs[i], top_vecs[i]);
+      //layers[i]->Reshape(bottom_vecs[i], top_vecs[i]);
       layers[i]->Forward(bottom_vecs[i], top_vecs[i]);
       forward_time_per_layer[i] += timer.MicroSeconds();
     }
     forward_time += forward_timer.MicroSeconds();
     backward_timer.Start();
+    LOG(INFO) << "Backward";
     for (int i = layers.size() - 1; i >= 0; --i) {
+      LOG(INFO) << "layer " << i;
       timer.Start();
       layers[i]->Backward(top_vecs[i], bottom_need_backward[i],
                           bottom_vecs[i]);
