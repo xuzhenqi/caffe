@@ -288,6 +288,7 @@ class NetTest : public MultiDeviceTest<TypeParam> {
       const bool force_backward = false, const bool bias_term = false,
       const Dtype blobs_lr_w1 = 1, const Dtype blobs_lr_b1 = 2,
       const Dtype blobs_lr_w2 = 1, const Dtype blobs_lr_b2 = 2) {
+    string bias_str = bias_term ? "true ":"false ";
     ostringstream proto;
     proto << "name: 'UnsharedWeightsNetwork' ";
     if (force_backward) {
@@ -314,7 +315,7 @@ class NetTest : public MultiDeviceTest<TypeParam> {
         "  type: 'InnerProduct' "
         "  inner_product_param { "
         "    num_output: 10 "
-        "    bias_term: " << bias_term <<
+        "    bias_term: " << bias_str <<
         "    weight_filler { "
         "      type: 'gaussian' "
         "      std: 10 "
@@ -340,7 +341,7 @@ class NetTest : public MultiDeviceTest<TypeParam> {
         "  type: 'InnerProduct' "
         "  inner_product_param { "
         "    num_output: 10 "
-        "    bias_term: " << bias_term <<
+        "    bias_term: " << bias_str <<
         "    weight_filler { "
         "      type: 'gaussian' "
         "      std: 10 "
@@ -610,6 +611,105 @@ class NetTest : public MultiDeviceTest<TypeParam> {
         "  bottom: 'norm1' "
         "  top: 'softmax' "
         "} ";
+    InitNetFromProtoString(proto);
+  }
+
+  virtual void InitSkipPropNet(bool test_skip_true) {
+    string proto =
+      "name: 'SkipPropTestNetwork' "
+      "layer { "
+      "  name: 'data' "
+      "  type: 'DummyData' "
+      "  dummy_data_param { "
+      "    shape { "
+      "      dim: 5 "
+      "      dim: 2 "
+      "      dim: 3 "
+      "      dim: 4 "
+      "    } "
+      "    data_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    shape { "
+      "      dim: 5 "
+      "    } "
+      "    data_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  top: 'data' "
+      "  top: 'label' "
+      "} "
+      "layer { "
+      "  name: 'silence' "
+      "  bottom: 'label' "
+      "  type: 'Silence' "
+      "} "
+      "layer { "
+      "  name: 'innerproduct' "
+      "  type: 'InnerProduct' "
+      "  inner_product_param { "
+      "    num_output: 1 "
+      "    weight_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    bias_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  param { "
+      "    lr_mult: 1 "
+      "    decay_mult: 1 "
+      "  } "
+      "  param { "
+      "    lr_mult: 2 "
+      "    decay_mult: 0 "
+      "  } "
+      "  bottom: 'data' "
+      "  top: 'innerproduct' "
+      "} "
+      "layer { "
+      "  name: 'ip_fake_labels' "
+      "  type: 'InnerProduct' "
+      "  inner_product_param { "
+      "    num_output: 1 "
+      "    weight_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    bias_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  bottom: 'data' "
+      "  top: 'fake_labels' "
+      "} "
+      "layer { "
+      "  name: 'argmax' "
+      "  bottom: 'fake_labels' "
+      "  top: 'label_argmax' "
+      "  type: 'ArgMax' "
+      "} "
+      "layer { "
+      "  name: 'loss' "
+      "  bottom: 'innerproduct' "
+      "  bottom: 'label_argmax' ";
+    if (test_skip_true)
+      proto += "  propagate_down: true "
+               "  propagate_down: false ";
+    else
+      proto += "  propagate_down: true "
+               "  propagate_down: true ";
+    proto +=
+      "  top: 'cross_entropy_loss' "
+      "  type: 'SigmoidCrossEntropyLoss' "
+      "  loss_weight: 0.1 "
+      "} ";
     InitNetFromProtoString(proto);
   }
 
@@ -1007,11 +1107,10 @@ TYPED_TEST(NetTest, TestSharedWeightsUpdate) {
   EXPECT_EQ(this->net_->layer_names()[2], "innerproduct2");
   Blob<Dtype>* ip1_weights = this->net_->layers()[1]->blobs()[0].get();
   Blob<Dtype>* ip2_weights = this->net_->layers()[2]->blobs()[0].get();
-  // Check that data blobs of shared weights share the same location in memory.
+  // Check that data and diff blobs of shared weights share the same memory
+  // locations.
   EXPECT_EQ(ip1_weights->cpu_data(), ip2_weights->cpu_data());
-  // Check that diff blobs of shared weights are at different locations in
-  // memory.  (The diffs should be accumulated at update time.)
-  EXPECT_NE(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
+  EXPECT_EQ(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
   this->net_->Forward(bottom);
   this->net_->Backward();
   // Compute the expected update as the data minus the two diffs.
@@ -1024,11 +1123,7 @@ TYPED_TEST(NetTest, TestSharedWeightsUpdate) {
   // Make sure the diffs are non-trivial.
   for (int i = 0; i < count; ++i) {
     EXPECT_NE(0, ip1_weights->cpu_diff()[i]);
-    EXPECT_NE(0, ip2_weights->cpu_diff()[i]);
-    EXPECT_NE(ip1_weights->cpu_diff()[i], ip2_weights->cpu_diff()[i]);
   }
-  caffe_axpy(count, Dtype(1), ip2_weights->cpu_diff(),
-             shared_params.mutable_cpu_diff());
   caffe_axpy(count, Dtype(-1), shared_params.cpu_diff(),
              shared_params.mutable_cpu_data());
   const Dtype* expected_updated_params = shared_params.cpu_data();
@@ -1065,8 +1160,8 @@ TYPED_TEST(NetTest, TestSharedWeightsUpdate) {
     EXPECT_NE(0, ip1_weights->cpu_diff()[i]);
     EXPECT_NE(0, ip2_weights->cpu_diff()[i]);
     EXPECT_NE(ip1_weights->cpu_diff()[i], ip2_weights->cpu_diff()[i]);
-    EXPECT_EQ(ip1_weights->cpu_diff()[i] + ip2_weights->cpu_diff()[i],
-              shared_params.cpu_diff()[i]);
+    EXPECT_FLOAT_EQ(ip1_weights->cpu_diff()[i] + ip2_weights->cpu_diff()[i],
+                    shared_params.cpu_diff()[i]);
   }
   caffe_axpy(count, Dtype(-1), ip1_weights->cpu_diff(),
              unshared_params1.mutable_cpu_data());
@@ -1096,11 +1191,10 @@ TYPED_TEST(NetTest, TestSharedWeightsResume) {
   EXPECT_EQ(this->net_->layer_names()[2], "innerproduct2");
   Blob<Dtype>* ip1_weights = this->net_->layers()[1]->blobs()[0].get();
   Blob<Dtype>* ip2_weights = this->net_->layers()[2]->blobs()[0].get();
-  // Check that data blobs of shared weights share the same location in memory.
+  // Check that data and diff blobs of shared weights share the same memory
+  // locations.
   EXPECT_EQ(ip1_weights->cpu_data(), ip2_weights->cpu_data());
-  // Check that diff blobs of shared weights are at different locations in
-  // memory.  (The diffs should be accumulated at update time.)
-  EXPECT_NE(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
+  EXPECT_EQ(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
   this->net_->ForwardBackward(bottom);
   this->net_->Update();
   Blob<Dtype> shared_params;
@@ -1123,14 +1217,13 @@ TYPED_TEST(NetTest, TestSharedWeightsResume) {
   ASSERT_FALSE(NULL == ip1_weights);
   ASSERT_FALSE(NULL == ip2_weights);
   EXPECT_NE(ip1_weights, ip2_weights);
-  // Check that data blobs of shared weights share the same location in memory.
+  // Check that data and diff blobs of shared weights share the same memory
+  // locations.
   EXPECT_EQ(ip1_weights->cpu_data(), ip2_weights->cpu_data());
+  EXPECT_EQ(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
   for (int i = 0; i < count; ++i) {
     EXPECT_FLOAT_EQ(shared_params.cpu_data()[i], ip1_weights->cpu_data()[i]);
   }
-  // Check that diff blobs of shared weights are at different locations in
-  // memory.  (The diffs should be accumulated at update time.)
-  EXPECT_NE(ip1_weights->cpu_diff(), ip2_weights->cpu_diff());
 }
 
 TYPED_TEST(NetTest, TestParamPropagateDown) {
@@ -2221,6 +2314,54 @@ TYPED_TEST(NetTest, TestReshape) {
   this->net_->Backward();
   for (int i = 0; i < output2.count(); ++i) {
     CHECK_EQ(*(output2.cpu_data() + i), *(output_blob->cpu_data() + i));
+  }
+}
+
+TYPED_TEST(NetTest, TestSkipPropagateDown) {
+  // check bottom_need_backward if propagate_down is true
+  this->InitSkipPropNet(false);
+  vector<bool> vec_layer_need_backward = this->net_->layer_need_backward();
+  for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
+    string layer_name = this->net_->layer_names()[layer_id];
+    if (layer_name == "loss") {
+      // access to bottom_need_backward coresponding to label's blob
+      bool need_back = this->net_->bottom_need_backward()[layer_id][1];
+      // if propagate_down is true, the loss layer will try to
+      // backpropagate on labels
+      EXPECT_TRUE(need_back) << "bottom_need_backward should be True";
+    }
+    // layer_need_backward should be True except for data and silence layers
+    if (layer_name.find("data") != std::string::npos ||
+          layer_name == "silence") {
+      EXPECT_FALSE(vec_layer_need_backward[layer_id])
+          << "layer_need_backward for " << layer_name << " should be False";
+    } else {
+      EXPECT_TRUE(vec_layer_need_backward[layer_id])
+          << "layer_need_backward for " << layer_name << " should be True";
+    }
+  }
+  // check bottom_need_backward if propagat_down is false
+  this->InitSkipPropNet(true);
+  vec_layer_need_backward.clear();
+  vec_layer_need_backward = this->net_->layer_need_backward();
+  for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
+    string layer_name = this->net_->layer_names()[layer_id];
+    if (layer_name == "loss") {
+      // access to bottom_need_backward coresponding to label's blob
+      bool need_back = this->net_->bottom_need_backward()[layer_id][1];
+      // if propagate_down is false, the loss layer will not try to
+      // backpropagate on labels
+      EXPECT_FALSE(need_back) << "bottom_need_backward should be False";
+    }
+    // layer_need_backward should be False except for innerproduct and
+    // loss layers
+    if (layer_name == "innerproduct" || layer_name == "loss") {
+      EXPECT_TRUE(vec_layer_need_backward[layer_id])
+          << "layer_need_backward for " << layer_name << " should be True";
+    } else {
+      EXPECT_FALSE(vec_layer_need_backward[layer_id])
+          << "layer_need_backward for " << layer_name << " should be False";
+    }
   }
 }
 
