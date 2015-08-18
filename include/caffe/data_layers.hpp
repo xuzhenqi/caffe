@@ -258,10 +258,10 @@ class ImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
 };
 
 template <typename Dtype>
-class TripletImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
+class TripletImageDataLayer : public BaseDataLayer<Dtype>, public InternalThread {
  public:
   explicit TripletImageDataLayer(const LayerParameter &param)
-      : BasePrefetchingDataLayer<Dtype>(param) {}
+      : BaseDataLayer<Dtype>(param) {}
   virtual ~TripletImageDataLayer();
   virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
                           const vector<Blob<Dtype>*> &top);
@@ -286,7 +286,8 @@ class TripletImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
   vector<int> label_size_;
   vector<string> lines_; 
   vector<int> labels_;
-  vector<Blob<Dtype>*> prefetch_data_;
+  vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
+  Blob<Dtype> transformed_data_;
 };
 
 /**

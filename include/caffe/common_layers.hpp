@@ -454,9 +454,7 @@ template <typename Dtype>
 class MVNLayer : public Layer<Dtype> {
  public:
   explicit MVNLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {
-    thres_ = this->layer_param_.mvn_param().thres();
-  }
+      : Layer<Dtype>(param) {}
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
@@ -475,8 +473,6 @@ class MVNLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-
-  Dtype thres_; 
 
   Blob<Dtype> mean_, variance_, temp_;
 

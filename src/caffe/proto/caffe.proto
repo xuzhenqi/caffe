@@ -98,7 +98,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 40 (last added: momentum2)
+// SolverParameter next available ID: 42 (last added: lr_change)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -166,6 +166,7 @@ message SolverParameter {
   //      zero by the max_iter. return base_lr (1 - iter/max_iter) ^ (power)
   //    - sigmoid: the effective learning rate follows a sigmod decay
   //      return base_lr ( 1/(1 + exp(-gamma * (iter - stepsize))))
+  //    - preset: (lr, lr_change)
   //
   // where base_lr, max_iter, gamma, step, stepvalue and power are defined
   // in the solver parameter protocol buffer, and iter is the current iteration.
@@ -183,12 +184,8 @@ message SolverParameter {
   repeated int32 stepvalue = 34;
 
 	// For doing preset learning rate
-	repeated float lr = 36;
-	repeated float lr_change = 37;
-
-	optional float max_momentum = 38 [default = 0.9];
-	optional float momentum_change = 39 [default = 500];
-	optional uint32 momentum_change_steps = 40 [default = 0];
+	repeated float lr = 40;
+	repeated float lr_change = 41;
 
   // Set clip_gradients to >= 0 to clip parameter gradients to that L2 norm,
   // whenever their actual L2 norm is larger.

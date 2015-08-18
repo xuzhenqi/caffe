@@ -86,7 +86,6 @@ void MVNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   int dim = bottom[0]->count() / num;
 
   if (this->layer_param_.mvn_param().normalize_variance()) {
-    /*
     caffe_gpu_mul(temp_.count(), top_data, top_diff, bottom_diff);
     caffe_gpu_gemv<Dtype>(CblasNoTrans, num, dim, 1., bottom_diff,
           sum_multiplier_.gpu_data(), 0., mean_.mutable_gpu_data());

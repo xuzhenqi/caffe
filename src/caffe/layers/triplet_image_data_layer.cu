@@ -8,7 +8,7 @@ template <typename Dtype>
 void TripletImageDataLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // First, join the thread
-  this->JoinPrefetchThread();
+  this->StopInternalThread();
   // Reshape to loaded data.
   for (int i = 0; i < 3; ++i) {
     top[i]->Reshape(this->prefetch_data_[i]->num(),
@@ -21,8 +21,8 @@ void TripletImageDataLayer<Dtype>::Forward_gpu(
     DLOG(INFO) << "Prefetch copied";
   }
   // Start a new prefetch thread
-  DLOG(INFO) << "CreatePrefetchThread";
-  this->CreatePrefetchThread();
+  DLOG(INFO) << "StopInternalThread";
+  this->StartInternalThread();
 }
 
 INSTANTIATE_LAYER_GPU_FORWARD(TripletImageDataLayer);

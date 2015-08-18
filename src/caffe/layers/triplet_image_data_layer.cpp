@@ -17,17 +17,14 @@ namespace caffe {
   
 template <typename Dtype>
 TripletImageDataLayer<Dtype>::~TripletImageDataLayer<Dtype>() {
-  this->JoinPrefetchThread();
-  delete this->prefetch_data_[0];
-  delete this->prefetch_data_[1];
-  delete this->prefetch_data_[2];
+  this->StopInternalThread();
 }
 
 template <typename Dtype>
 void TripletImageDataLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*> &bottom,
     const vector<Blob<Dtype>*> &top) {
-  BaseDataLayer<Dtype>::LayerSetUp(bottom, top);
+  BaseDataLayer<Dtype>::LayerSetUp(bottom, top); // will call DataLayerSetUp
   // Now, start the prefetch thread. Before calling prefetch, we make three
   // cpu_data calls so that the prefetch thread does not accidentally make
   // simultaneous cudaMalloc calls when the main thread is running. In some
@@ -37,7 +34,7 @@ void TripletImageDataLayer<Dtype>::LayerSetUp(
   this->prefetch_data_[2]->mutable_cpu_data();
 
   DLOG(INFO) << "Initializing prefetch";
-  this->CreatePrefetchThread();
+  this->StartInternalThread();
   DLOG(INFO) << "Prefetch initialized.";
 }
 
@@ -99,9 +96,9 @@ void TripletImageDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bo
   // image
   const int crop_size = this->layer_param_.transform_param().crop_size();
   const int batch_size = this->layer_param_.image_data_param().batch_size();
-  this->prefetch_data_.push_back(new Blob<Dtype>());
-  this->prefetch_data_.push_back(new Blob<Dtype>());
-  this->prefetch_data_.push_back(new Blob<Dtype>());
+  this->prefetch_data_.push_back(shared_ptr<Blob <Dtype> >(new Blob<Dtype>()));
+  this->prefetch_data_.push_back(shared_ptr<Blob <Dtype> >(new Blob<Dtype>()));
+  this->prefetch_data_.push_back(shared_ptr<Blob <Dtype> >(new Blob<Dtype>()));
   if (crop_size > 0) {
     top[0]->Reshape(batch_size, channels, crop_size, crop_size);
     top[1]->Reshape(batch_size, channels, crop_size, crop_size);
@@ -202,7 +199,7 @@ template <typename Dtype>
 void TripletImageDataLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // First, join the thread
-  this->JoinPrefetchThread();
+  this->StopInternalThread();
   DLOG(INFO) << "Thread joined";
   // Reshape to loaded data.
   for (int i = 0; i < 3; ++i) {
@@ -216,8 +213,8 @@ void TripletImageDataLayer<Dtype>::Forward_cpu(
     DLOG(INFO) << "Prefetch copied";
   }
   // Start a new prefetch thread
-  DLOG(INFO) << "CreatePrefetchThread";
-  this->CreatePrefetchThread();
+  DLOG(INFO) << "StartInternalThread";
+  this->StartInternalThread();
 }
 
 #ifdef CPU_ONLY
