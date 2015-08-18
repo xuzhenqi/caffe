@@ -1,8 +1,10 @@
 import unittest
 import tempfile
 import os
+import six
 
 import caffe
+
 
 class SimpleLayer(caffe.Layer):
     """A layer that just multiplies by ten"""
@@ -19,8 +21,16 @@ class SimpleLayer(caffe.Layer):
     def backward(self, top, propagate_down, bottom):
         bottom[0].diff[...] = 10 * top[0].diff
 
+
+class ExceptionLayer(caffe.Layer):
+    """A layer for checking exceptions from Python"""
+
+    def setup(self, bottom, top):
+        raise RuntimeError
+
+
 def python_net_file():
-    with tempfile.NamedTemporaryFile(delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as f:
         f.write("""name: 'pythonnet' force_backward: true
         input: 'data' input_shape { dim: 10 dim: 9 dim: 8 }
         layer { type: 'Python' name: 'one' bottom: 'data' top: 'one'
@@ -30,6 +40,17 @@ def python_net_file():
         layer { type: 'Python' name: 'three' bottom: 'two' top: 'three'
           python_param { module: 'test_python_layer' layer: 'SimpleLayer' } }""")
         return f.name
+
+
+def exception_net_file():
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as f:
+        f.write("""name: 'pythonnet' force_backward: true
+        input: 'data' input_shape { dim: 10 dim: 9 dim: 8 }
+        layer { type: 'Python' name: 'layer' bottom: 'data' top: 'top'
+          python_param { module: 'test_python_layer' layer: 'ExceptionLayer' } }
+          """)
+        return f.name
+
 
 class TestPythonLayer(unittest.TestCase):
     def setUp(self):
@@ -55,6 +76,11 @@ class TestPythonLayer(unittest.TestCase):
         s = 4
         self.net.blobs['data'].reshape(s, s, s, s)
         self.net.forward()
-        for blob in self.net.blobs.itervalues():
+        for blob in six.itervalues(self.net.blobs):
             for d in blob.data.shape:
                 self.assertEqual(s, d)
+
+    def test_exception(self):
+        net_file = exception_net_file()
+        self.assertRaises(RuntimeError, caffe.Net, net_file, caffe.TEST)
+        os.remove(net_file)

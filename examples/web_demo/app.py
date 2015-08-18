@@ -10,14 +10,14 @@ import tornado.wsgi
 import tornado.httpserver
 import numpy as np
 import pandas as pd
-import Image
+from PIL import Image
 import cStringIO as StringIO
 import urllib
 import exifutil
 
 import caffe
 
-REPO_DIRNAME = os.path.abspath(os.path.dirname(__file__) + '/../..')
+REPO_DIRNAME = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 UPLOAD_FOLDER = '/tmp/caffe_demos_uploads'
 ALLOWED_IMAGE_EXTENSIONS = set(['png', 'bmp', 'jpg', 'jpe', 'jpeg', 'gif'])
 
