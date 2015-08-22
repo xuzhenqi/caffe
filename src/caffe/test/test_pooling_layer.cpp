@@ -606,6 +606,75 @@ TYPED_TEST(PoolingLayerTest, TestGradientAvePadded) {
   }
 }
 
+TYPED_TEST(PoolingLayerTest, TestForwardL2N) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+  pooling_param->set_kernel_size(3);
+  pooling_param->set_stride(1);
+  pooling_param->set_pad(1);
+  pooling_param->set_pool(PoolingParameter_PoolMethod_L2NORM);
+  this->blob_bottom_->Reshape(1, 1, 3, 3);
+  FillerParameter filler_param;
+  filler_param.set_value(Dtype(2));
+  ConstantFiller<Dtype> filler(filler_param);
+  filler.Fill(this->blob_bottom_);
+  PoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), 1);
+  EXPECT_EQ(this->blob_top_->channels(), 1);
+  EXPECT_EQ(this->blob_top_->height(), 3);
+  EXPECT_EQ(this->blob_top_->width(), 3);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  Dtype epsilon = 1e-5;
+  EXPECT_NEAR(this->blob_top_->cpu_data()[0], 4.0 / 3, epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[1], 2.0 / 3 * sqrt(6), epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[2], 4.0 / 3, epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[3], 2.0 / 3 * sqrt(6), epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[4], 2.0    , epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[5], 2.0 / 3 * sqrt(6), epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[6], 4.0 / 3, epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[7], 2.0 / 3 * sqrt(6), epsilon);
+  EXPECT_NEAR(this->blob_top_->cpu_data()[8], 4.0 / 3, epsilon);
+}
+
+TYPED_TEST(PoolingLayerTest, TestGradientL2N) {
+  typedef typename TypeParam::Dtype Dtype;
+  for (int kernel_h = 3; kernel_h <= 4; kernel_h++) {
+    for (int kernel_w = 3; kernel_w <= 4; kernel_w++) {
+      LayerParameter layer_param;
+      PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+      pooling_param->set_kernel_h(kernel_h);
+      pooling_param->set_kernel_w(kernel_w);
+      pooling_param->set_stride(2);
+      pooling_param->set_pool(PoolingParameter_PoolMethod_L2NORM);
+      PoolingLayer<Dtype> layer(layer_param);
+      GradientChecker<Dtype> checker(1e-2, 1e-2);
+      checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+          this->blob_top_vec_);
+    }
+  }
+}
+
+TYPED_TEST(PoolingLayerTest, TestGradientL2NPadded) {
+  typedef typename TypeParam::Dtype Dtype;
+  for (int kernel_h = 3; kernel_h <= 4; kernel_h++) {
+    for (int kernel_w = 3; kernel_w <= 4; kernel_w++) {
+      LayerParameter layer_param;
+      PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+      pooling_param->set_kernel_h(kernel_h);
+      pooling_param->set_kernel_w(kernel_w);
+      pooling_param->set_stride(2);
+      pooling_param->set_pad(2);
+      pooling_param->set_pool(PoolingParameter_PoolMethod_L2NORM);
+      PoolingLayer<Dtype> layer(layer_param);
+      GradientChecker<Dtype> checker(1e-3, 1e-2);
+      checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+          this->blob_top_vec_);
+    }
+  }
+}
+
 #ifdef USE_CUDNN
 template <typename Dtype>
 class CuDNNPoolingLayerTest : public GPUDeviceTest<Dtype> {

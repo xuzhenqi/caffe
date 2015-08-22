@@ -1,4 +1,5 @@
 import pdb
+import copy
 
 # When enable editing a param, taking the reference copy of python
 
@@ -9,15 +10,18 @@ class Compound:
             # if 'name' in kwargs.keys(): self.name = kwargs['name']
             exec("self." + key + " = []");
             exec("if '" + key + "' in kwargs.keys(): self." + key +
-                 " = kwargs['" + key + "']")
+                 " = copy.deepcopy(kwargs['" + key + "'])")
 
     def display(self, level=0):
-        string = level * "  " + "layer {\n"
+        #import ipdb;ipdb.set_trace()
+        string = " {\n"
         level += 1
         for key in self.__titles__:
             #for v in self.name:
             #    string += v.display(level)
-            exec("for v in self." + key + ": string += v.display(level)")
+            exec("for v in self." + key + 
+            ":\n  if not isinstance(v, Atom):\n    string += level * '  ' + '" 
+                    + key + "'\n  string += v.display(level)")
         string += (level - 1) * "  " + "}\n"
         return string
 
@@ -160,13 +164,20 @@ class TripletImageDataParameter(Compound):
 
 
 class Atom:
-    def __init__(self, title, value):
+    def __init__(self, title, value, isstring = False):
         self.title = title
         self.value = value
+        self.isstring = isstring
 
     def display(self, level):
-        return level * "  " + self.title + ": " + str(self.value) + "\n"
-
+        string = level * "  " + self.title + ": "
+        if self.isstring:
+            string += "\""
+        string += str(self.value)
+        if self.isstring:
+            string += "\""
+        string += "\n"
+        return string
 
 class LayerParameter(Compound):
     def __init__(self, **kwargs):
@@ -194,8 +205,88 @@ class NetState(Compound):
         self.__titles__ = ['phase', 'level', 'stage']
         self.initial(kwargs)
 
+class Block():
+    def display(self):
+        string = ''
+        for v in self.__layers__:
+            string += 'layer' + v.display()
+        return string
+
+class ConvolutionBlock(Block):
+    def __init__(self, name, bottom, top, param):
+        self.name = name
+        self.bottom = bottom
+        self.top = top
+        self.param = param
+        self.c_p = ConvolutionParam(type = [Atom('type', 'Convolution', True)],
+            num_output = [Atom('num_output', param[0])],
+            pad = [Atom('pad', param[1])], 
+            kernel_size = [Atom('kernel_size', param[2])],
+            stride = [Atom('stride', param[3])],
+            weight_filler = [wf],
+            bias_filler = [bf])
+        self.c_l_1 = LayerParameter(type = [Atom('type', 'Convolution', True)],
+            param = [pw, pb],
+            convolution_param = [c_p])
+        self.p = LayerParameter(type = [Atom('type', 'ReLU', True)])
+        self.change()
+        self.__layers__ = [self.c_l_1, self.p]
+    def change(self):
+        self.c_l_1.name = [Atom('name', self.name + '/conv', True)]
+        self.c_l_1.bottom = [Atom('bottom', self.bottom, True)]
+        self.c_l_1.top = [Atom('bottom', self.name + '/conv', True)]
+        self.p.name = [Atom('name', 'conv1/relu', True)]
+        self.p.bottom = [Atom('bottom', self.name + '/conv', True)]
+        self.p.top = [Atom('top', self.top, True)]
+    def set_name(self):
+        None
+    def set_bottom(self):
+        None
+    def set_top(self):
+        None
+
+
+
+        
+pw = ParamSpec(lr_mult = [Atom('lr_mult', 1)],
+        decay_mult = [Atom('decay_mult', 1)])
+pb = ParamSpec(lr_mult = [Atom('lr_mult', 2)],
+        decay_mult = [Atom('decay_mult', 0)])
+wf = FillerParameter(type = [Atom('type', 'xavier', True)],
+        std = [Atom('std', 0.1)])
+bf = FillerParameter(type = [Atom('type', 'constant', True)],
+            std = [Atom('value', 0.2)])
+
+
 if __name__ == '__main__':
-    l = Layer(name = [Atom('name','test')], type = [Atom('type', 'Convolution')])
-    print l.display()
-
-
+    # image_data_layer
+    dataset = "/mnt/dataset2/CASIAWebFace/"
+    i_d_p = ImageDataParameter(
+            source = [Atom('source', '\"' + dataset + 'filelist_crop.txt\"')],
+            batch_size = [Atom('batch_size', '60')],
+            root_folder = [Atom('root_folder', '\"' + dataset + 'casia_crop/\"')])
+    t_i_d_p = TripletImageDataParameter(
+            statics = [Atom('statics', '\"' + dataset + 'identities.txt\"')])
+    t_i_d_l = LayerParameter(
+            name = [Atom('name', 'tripleData', True)],
+            type = [Atom('type', 'TripletImageData', True)],
+            top = [Atom('top', 'data_1', True), Atom('top', 'data_2', True), 
+                Atom('top', 'data_3', True)],
+            image_data_param = [i_d_p],
+            triplet_image_data_param = [t_i_d_p])
+    c_p = ConvolutionParam(type = [Atom('type', 'Convolution', True)],
+        num_output = [Atom('num_output', 64)],
+        pad = [Atom('pad', 1)], 
+        kernel_size = [Atom('kernel_size', 3)],
+        stride = [Atom('stride', 1)],
+        weight_filler = [wf],
+        bias_filler = [bf])
+    c_l_1 = LayerParameter(type = [Atom('type', 'Convolution', True)],
+        param = [pw, pb],
+        convolution_param = [c_p])
+    #print c_l.display()
+    cb1 = ConvolutionBlock('conv1', 'data_1', 'conv1', [64, 1, 3, 1])
+    p_p = PoolingParameter(pool = [Atom('pool', 'MAX')],
+            kernel_size = [Atom('kernel_size', 3)],
+            stride = [Atom('stride', 2)])
+    p_l = LayerParameter()

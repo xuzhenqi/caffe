@@ -24,7 +24,8 @@ shared_ptr<Layer<Dtype> > GetConvolutionLayer(
   if (engine == ConvolutionParameter_Engine_DEFAULT) {
     engine = ConvolutionParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = ConvolutionParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = ConvolutionParameter_Engine_CUDNN;
 #endif
   }
   if (engine == ConvolutionParameter_Engine_CAFFE) {
@@ -47,7 +48,8 @@ shared_ptr<Layer<Dtype> > GetPoolingLayer(const LayerParameter& param) {
   if (engine == PoolingParameter_Engine_DEFAULT) {
     engine = PoolingParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = PoolingParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = PoolingParameter_Engine_CUDNN;
 #endif
   }
   if (engine == PoolingParameter_Engine_CAFFE) {
@@ -56,8 +58,10 @@ shared_ptr<Layer<Dtype> > GetPoolingLayer(const LayerParameter& param) {
   } else if (engine == PoolingParameter_Engine_CUDNN) {
     PoolingParameter p_param = param.pooling_param();
     if (p_param.pad() || p_param.pad_h() || p_param.pad_w() ||
-        param.top_size() > 1) {
+        param.top_size() > 1 || 
+        p_param.pool() == PoolingParameter_PoolMethod_L2NORM) {
       LOG(INFO) << "CUDNN does not support padding or multiple tops. "
+                << "CUDNN does not support L2Norm pooling."
                 << "Using Caffe's own pooling layer.";
       return shared_ptr<Layer<Dtype> >(new PoolingLayer<Dtype>(param));
     }
@@ -77,7 +81,8 @@ shared_ptr<Layer<Dtype> > GetReLULayer(const LayerParameter& param) {
   if (engine == ReLUParameter_Engine_DEFAULT) {
     engine = ReLUParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = ReLUParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = ReLUParameter_Engine_CUDNN;
 #endif
   }
   if (engine == ReLUParameter_Engine_CAFFE) {
@@ -100,7 +105,8 @@ shared_ptr<Layer<Dtype> > GetSigmoidLayer(const LayerParameter& param) {
   if (engine == SigmoidParameter_Engine_DEFAULT) {
     engine = SigmoidParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = SigmoidParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = SigmoidParameter_Engine_CUDNN;
 #endif
   }
   if (engine == SigmoidParameter_Engine_CAFFE) {
@@ -123,7 +129,8 @@ shared_ptr<Layer<Dtype> > GetSoftmaxLayer(const LayerParameter& param) {
   if (engine == SoftmaxParameter_Engine_DEFAULT) {
     engine = SoftmaxParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = SoftmaxParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = SoftmaxParameter_Engine_CUDNN;
 #endif
   }
   if (engine == SoftmaxParameter_Engine_CAFFE) {
@@ -146,7 +153,8 @@ shared_ptr<Layer<Dtype> > GetTanHLayer(const LayerParameter& param) {
   if (engine == TanHParameter_Engine_DEFAULT) {
     engine = TanHParameter_Engine_CAFFE;
 #ifdef USE_CUDNN
-    engine = TanHParameter_Engine_CUDNN;
+    if (Caffe::mode() == Caffe::GPU)
+      engine = TanHParameter_Engine_CUDNN;
 #endif
   }
   if (engine == TanHParameter_Engine_CAFFE) {
