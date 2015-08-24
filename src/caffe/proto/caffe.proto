@@ -153,7 +153,6 @@ message SolverParameter {
   optional int32 max_iter = 7; // the maximum number of iterations
   // accumulate gradients over `iter_size` x `batch_size` instances
   optional int32 iter_size = 36 [default = 1];
-
   // The learning rate decay policy. The currently implemented learning rate
   // policies are as follows:
   //    - fixed: always return base_lr.
