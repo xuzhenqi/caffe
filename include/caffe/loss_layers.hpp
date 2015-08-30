@@ -829,6 +829,45 @@ class TripletLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> temp_;
 };
 
+/**
+ * @brief Computes the triplet loss in combining inputs into triplet samples.
+ * This layer accepts only one bottom blob, with [class] classes, 
+ * and each class has num pictures. The layer generate all possible triplets
+ * from the input and compute the loss.
+ */
+template <typename Dtype>
+class TripletCombineLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit TripletCombineLossLayer(const LayerParameter &param)
+      : LossLayer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                          const vector<Blob<Dtype>*> &top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline int ExactNumBottomBlobs() const {return 1; }
+  virtual inline bool AllowForceBackward(const int bottom_index) const {
+    return true;
+  }
+  virtual inline const char* type() const {return "TripletCombineLoss"; }
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top); 
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  Dtype margin_;
+  int class_;
+  int num_;
+  int dim_;
+  shared_ptr<SyncedMemory> diff_;
+  shared_ptr<SyncedMemory> dist_;
+  shared_ptr<SyncedMemory> loss_;
+};
 
 }  // namespace caffe
 
