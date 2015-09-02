@@ -76,6 +76,18 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   bool bias_term_;
   bool is_1x1_;
 
+  int conv_out_channels_;
+  int conv_in_channels_;
+  int conv_out_spatial_dim_;
+  int conv_in_height_;
+  int conv_in_width_;
+  int kernel_dim_;
+  int weight_offset_;
+  int col_offset_;
+  int output_offset_;
+
+  Blob<Dtype> col_buffer_;
+  Blob<Dtype> bias_multiplier_;
  private:
   // wrap im2col/col2im so we don't have to remember the (long) argument lists
   inline void conv_im2col_cpu(const Dtype* data, Dtype* col_buff) {
@@ -97,18 +109,6 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   }
 #endif
 
-  int conv_out_channels_;
-  int conv_in_channels_;
-  int conv_out_spatial_dim_;
-  int conv_in_height_;
-  int conv_in_width_;
-  int kernel_dim_;
-  int weight_offset_;
-  int col_offset_;
-  int output_offset_;
-
-  Blob<Dtype> col_buffer_;
-  Blob<Dtype> bias_multiplier_;
 };
 
 /**
@@ -175,6 +175,98 @@ class ConvolutionLayer : public BaseConvolutionLayer<Dtype> {
   virtual inline bool reverse_dimensions() { return false; }
   virtual void compute_output_shape();
 };
+
+
+template <typename Dtype>
+class ConvolutionRNNLayer : public BaseConvolutionLayer<Dtype> {
+ public:
+  explicit ConvolutionRNNLayer(const LayerParameter& param)
+      : BaseConvolutionLayer<Dtype>(param) {}
+
+  virtual inline const char* type() const { return "ConvolutionRNN"; }
+  
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline int MinBottomBlobs() const { return -1; }
+  virtual inline int MinTopBlobs() const { return -1; }
+  virtual inline bool EqualNumBottomTopBlobs() const { return false; }
+  virtual inline int ExactBottomBlobs() const {return 2;}
+  virtual inline int ExactTopBlobs() const {return 1;}
+  inline Blob<Dtype>& get_previous() { return previous_; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual inline bool reverse_dimensions() { return false; }
+  virtual void compute_output_shape();
+
+  Blob<Dtype> previous_;
+  Blob<Dtype> previous_out_;
+  Blob<Dtype> col_buffer_previous_;
+  
+  int conv_in_channels_previous_;
+  int kernel_dim_previous_;
+  int col_offset_previous_;
+  int weight_offset_previous_;
+ protected:
+  // Helper functions that abstract away the column buffer and gemm arguments.
+  // The last argument in forward_cpu_gemm is so that we can skip the im2col if
+  // we just called weight_cpu_gemm with the same input.
+  void forward_rnn_cpu_gemm(const Dtype* input, const Dtype* weights,
+      Dtype* output, bool skip_im2col = false);
+  void backward_rnn_cpu_gemm(const Dtype* input, const Dtype* weights,
+      Dtype* output);
+  void weight_rnn_cpu_gemm(const Dtype* input, const Dtype* output, Dtype*
+      weights);
+
+#ifndef CPU_ONLY
+  void forward_rnn_gpu_gemm(const Dtype* col_input, const Dtype* weights,
+      Dtype* output, bool skip_im2col = false);
+  void backward_rnn_gpu_gemm(const Dtype* input, const Dtype* weights,
+      Dtype* col_output);
+  void weight_rnn_gpu_gemm(const Dtype* col_input, const Dtype* output, Dtype*
+      weights);
+#endif
+ private:
+  // wrap im2col/col2im so we don't have to remember the (long) argument lists
+  inline void conv_im2col_rnn_cpu(const Dtype* data, Dtype* col_buff) {
+    im2col_cpu(data, conv_in_channels_previous_, this->conv_in_height_, 
+        this->conv_in_width_,
+        this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
+        this->stride_h_, this->stride_w_, col_buff);
+  }
+  inline void conv_col2im_rnn_cpu(const Dtype* col_buff, Dtype* data) {
+    col2im_cpu(col_buff, conv_in_channels_previous_, this->conv_in_height_, 
+        this->conv_in_width_,
+        this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
+        this->stride_h_, this->stride_w_, data);
+  }
+#ifndef CPU_ONLY
+  inline void conv_im2col_rnn_gpu(const Dtype* data, Dtype* col_buff) {
+    im2col_gpu(data, conv_in_channels_previous_, this->conv_in_height_, 
+        this->conv_in_width_,
+        this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
+        this->stride_h_, this->stride_w_, col_buff);
+  }
+  inline void conv_col2im_rnn_gpu(const Dtype* col_buff, Dtype* data) {
+    col2im_gpu(col_buff, conv_in_channels_previous_, this->conv_in_height_, 
+        this->conv_in_width_,
+        this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
+        this->stride_h_, this->stride_w_, data);
+  }
+#endif
+
+};
+
 
 /**
  * @brief Convolve the input with a bank of learned filters, and (optionally)

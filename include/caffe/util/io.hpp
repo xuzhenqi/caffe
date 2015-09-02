@@ -35,6 +35,20 @@ inline void DumpMatrixToTxt(const char* file_name, const int N, const Dtype* vec
   ofs.flush();
 }
 
+template <class Dtype>
+inline void DumpMatrixToTxt(const char* file_prefix, const Blob<Dtype>& blob,
+                            bool dump_diff = false) {
+  int N = blob.count();
+  const vector<int> &shape = blob.shape();
+  string filename(file_prefix);
+  filename += string(".data");
+  DumpMatrixToTxt(filename.c_str(), N, blob.cpu_data(), shape);
+  if (dump_diff) {
+    filename = string(file_prefix) + string(".diff");
+    DumpMatrixToTxt(filename.c_str(), N, blob.cpu_diff(), shape);
+  }
+}
+
 inline void MakeTempFilename(string* temp_filename) {
   temp_filename->clear();
   *temp_filename = "/tmp/caffe_test.XXXXXX";
