@@ -181,7 +181,8 @@ template <typename Dtype>
 class ConvolutionRNNLayer : public BaseConvolutionLayer<Dtype> {
  public:
   explicit ConvolutionRNNLayer(const LayerParameter& param)
-      : BaseConvolutionLayer<Dtype>(param) {}
+      : BaseConvolutionLayer<Dtype>(param), 
+      neuron_layer_(new ReLULayer<Dtype>(param)) {}
 
   virtual inline const char* type() const { return "ConvolutionRNN"; }
   
@@ -212,6 +213,7 @@ class ConvolutionRNNLayer : public BaseConvolutionLayer<Dtype> {
   Blob<Dtype> previous_;
   Blob<Dtype> previous_out_;
   Blob<Dtype> col_buffer_previous_;
+  shared_ptr<Layer<Dtype> > neuron_layer_;
   
   int conv_in_channels_previous_;
   int kernel_dim_previous_;

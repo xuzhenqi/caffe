@@ -111,6 +111,7 @@ void ConvolutionRNNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   }
   // Propagate gradients to the parameters (as directed by backward pass).
   this->param_propagate_down_.resize(this->blobs_.size(), true);
+  neuron_layer_->LayerSetUp(top, top);
   Reshape(bottom, top);
   caffe_set(previous_.count(), Dtype(0), previous_.mutable_cpu_data());
 }
@@ -177,6 +178,7 @@ void ConvolutionRNNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     caffe_set(this->bias_multiplier_.count(), Dtype(1),
         this->bias_multiplier_.mutable_cpu_data());
   }
+  neuron_layer_->Reshape(top, top);
 }
 
 template <typename Dtype>
@@ -344,6 +346,7 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   //           previous_out_.mutable_cpu_diff());
   caffe_add(previous_.count(), previous_out_.cpu_data(), top[0]->cpu_data(),
             top[0]->mutable_cpu_data());
+  neuron_layer_->Forward(top, top);
   //DumpMatrixToTxt("temp/top_2", *(top[0]));
   caffe_copy(previous_.count(), previous_.cpu_data(), 
              previous_out_.mutable_cpu_data());
@@ -355,6 +358,8 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void ConvolutionRNNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+  vector<bool> temp(top.size(), true);
+  neuron_layer_->Backward(top, temp, top);
   const Dtype* weight = this->blobs_[0]->cpu_data();
   Dtype* weight_diff = this->blobs_[0]->mutable_cpu_diff();
   const Dtype* top_diff = top[0]->cpu_diff();

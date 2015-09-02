@@ -231,7 +231,7 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
   */
   // Check against reference convolution.
   const Dtype* top_data;
-  const Dtype* ref_top_data;
+  Dtype* ref_top_data;
   caffe_conv(this->blob_bottom_, convolution_param, layer->blobs()[0], 
              layer->blobs()[2],
              this->MakeReferenceTop(this->blob_top_));
@@ -252,11 +252,13 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
             this->ref_blob_top_->mutable_cpu_data());
   //std::cout << "caffe_add" << std::endl;
   top_data = this->blob_top_->cpu_data();
-  ref_top_data = this->ref_blob_top_->cpu_data();
+  ref_top_data = this->ref_blob_top_->mutable_cpu_data();
 
   for (int i = 0; i < this->blob_top_->count(); ++i) {
+    if (ref_top_data[i] < 0)
+      ref_top_data[i] = 0;
     EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-4);
-    EXPECT_NEAR(top_data[i], ((ConvolutionRNNLayer<Dtype>*)layer.get())
+    EXPECT_NEAR(ref_top_data[i], ((ConvolutionRNNLayer<Dtype>*)layer.get())
                 ->get_previous().cpu_data()[i], 1e-4);
   }
   //std::cout << "caffe_check" << std::endl;
@@ -277,8 +279,10 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
             this->ref_blob_top_->cpu_data(),
             this->ref_blob_top_->mutable_cpu_data());
   top_data = this->blob_top_->cpu_data();
-  ref_top_data = this->ref_blob_top_->cpu_data();
+  ref_top_data = this->ref_blob_top_->mutable_cpu_data();
   for (int i = 0; i < this->blob_top_->count(); ++i) {
+    if (ref_top_data[i] < 0)
+      ref_top_data[i] = 0;
     EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-4);
   }
 }
@@ -305,8 +309,8 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestGradient) {
   Blob<Dtype>& layer_previous = layer.get_previous();
   layer_previous.CopyFrom(*(this->previous_));
   vector<bool> propagate_down(1, true);
-  Dtype stepsize_ = 0.01;
-  Dtype threshold_ = 0.001;
+  Dtype stepsize_ = 0.001;
+  Dtype threshold_ = 0.01;
   for (int i = 0; i < this->blob_top_->count(); ++i) {
     vector<Blob<Dtype>*> blobs_to_check;
     for (int i = 0; i < layer.blobs().size(); ++i) {

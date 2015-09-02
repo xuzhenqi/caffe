@@ -35,6 +35,7 @@ void ConvolutionRNNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   }
   caffe_gpu_add(previous_.count(), previous_out_.gpu_data(), top[0]->gpu_data(),
             top[0]->mutable_gpu_data());
+  neuron_layer_->Forward(top, top);
   caffe_copy(previous_.count(), previous_.gpu_data(), 
              previous_out_.mutable_gpu_data());
   caffe_copy(previous_.count(), top[0]->gpu_data(), 
@@ -44,6 +45,8 @@ void ConvolutionRNNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void ConvolutionRNNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+  vector<bool> temp(top.size(), true);
+  neuron_layer_->Backward(top, temp, top);
   const Dtype* weight = this->blobs_[0]->gpu_data();
   Dtype* weight_diff = this->blobs_[0]->mutable_gpu_diff();
   const Dtype* top_diff = top[0]->gpu_diff();
