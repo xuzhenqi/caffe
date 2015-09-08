@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "hdf5.h"
+#include "boost/random/uniform_int.hpp"
 
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
@@ -258,7 +259,43 @@ class ImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
 };
 
 template <typename Dtype>
-class TripletImageDataLayer : public BaseDataLayer<Dtype>, public InternalThread {
+class ImageDataRNNLayer : public BaseDataLayer<Dtype>, public InternalThread {
+ public:
+  explicit ImageDataRNNLayer(const LayerParameter& param)
+      : BaseDataLayer<Dtype>(param) {}
+  virtual ~ImageDataRNNLayer();
+  virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                          const vector<Blob<Dtype>*> &top);
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ImageDataRNN"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 3; }
+
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+ protected:
+  virtual void InternalThreadEntry();
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+  shared_ptr<boost::uniform_int<int> > unifor_gen;
+
+  vector<std::pair<std::string, int> > lines_;
+  vector<int> frames_;
+  vector<int> current_frame_;
+  vector<int> current_line_id_;
+  vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
+  Blob<Dtype> transformed_data_;
+  int lines_id_;
+  int fps_;
+};
+
+template <typename Dtype>
+class TripletImageDataLayer : public BaseDataLayer<Dtype>, 
+    public InternalThread {
  public:
   explicit TripletImageDataLayer(const LayerParameter &param)
       : BaseDataLayer<Dtype>(param) {}

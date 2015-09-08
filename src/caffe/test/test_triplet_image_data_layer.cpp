@@ -35,7 +35,7 @@ class TripletImageDataLayerTest : public MultiDeviceTest<TypeParam> {
     blob_top_vec_.push_back(new Blob<Dtype>());
     blob_top_vec_.push_back(new Blob<Dtype>());
     Caffe::set_random_seed(seed_);
-    // To do
+    // TODO
     filename_ = string("/mnt/dataset2/CASIAWebFace/filelist_crop.txt");
     statics_ = string("/mnt/dataset2/CASIAWebFace/identities.txt");
     root_dir_ = string("/mnt/dataset2/CASIAWebFace/casia_crop/");

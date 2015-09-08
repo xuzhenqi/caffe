@@ -305,8 +305,8 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 148 
-// (last added:spp_param)
+// LayerParameter next available layer-specific ID: 149 
+// (last added: image_data_rnn_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -370,6 +370,7 @@ message LayerParameter {
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
   optional ImageDataParameter image_data_param = 115;
+  optional ImageDataRNNParameter image_data_rnn_param = 148;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
   optional L2NParameter l2n_param = 140;
@@ -399,6 +400,11 @@ message LayerParameter {
   optional TripletLossParameter triplet_loss_param = 141;
   optional TripletImageDataParameter triplet_image_data_param = 142;
   optional WindowDataParameter window_data_param = 129;
+}
+
+// Message that stores parameters used by ImageDataRNNParameter
+message ImageDataRNNParameter {
+  optional uint32 fps = 1 [default = 5];
 }
 
 // Message that stores parameters used by TripletImageDataLayer
