@@ -179,6 +179,8 @@ void ConvolutionRNNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
         this->bias_multiplier_.mutable_cpu_data());
   }
   neuron_layer_->Reshape(top, top);
+
+  CHECK_EQ(bottom[0]->num(), bottom[1]->count());
 }
 
 template <typename Dtype>
@@ -315,8 +317,6 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* weight = this->blobs_[0]->cpu_data();
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
-  //DumpMatrixToTxt("temp/weight_0", *(this->blobs_[0]));
-  //DumpMatrixToTxt("temp/bottom", *(bottom[0]));
   for (int n = 0; n < this->num_; ++n) {
     this->forward_cpu_gemm(bottom_data + bottom[0]->offset(n), weight,
         top_data + top[0]->offset(n));
@@ -325,11 +325,6 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       this->forward_cpu_bias(top_data + top[0]->offset(n), bias);
     }
   }
-  //DumpMatrixToTxt("temp/top_1", *(top[0]));
-  //DumpMatrixToTxt("temp/bias_0", *(this->blobs_[2]));
-  //DumpMatrixToTxt("temp/bias_1", *(this->blobs_[3]));
-  //DumpMatrixToTxt("temp/weight_1", *(this->blobs_[1]));
-  //DumpMatrixToTxt("temp/previous", previous_);
   weight = this->blobs_[1]->cpu_data();
   top_data = previous_out_.mutable_cpu_data();
   bottom_data = previous_.cpu_data();
@@ -341,17 +336,22 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       this->forward_cpu_bias(top_data + previous_out_.offset(n), bias);
     }
   }
-  //DumpMatrixToTxt("temp/previous_out", previous_out_);
-  //caffe_copy(previous_.count(), previous_out_.cpu_data(), 
-  //           previous_out_.mutable_cpu_diff());
   caffe_add(previous_.count(), previous_out_.cpu_data(), top[0]->cpu_data(),
             top[0]->mutable_cpu_data());
   neuron_layer_->Forward(top, top);
-  //DumpMatrixToTxt("temp/top_2", *(top[0]));
   caffe_copy(previous_.count(), previous_.cpu_data(), 
              previous_out_.mutable_cpu_data());
   caffe_copy(previous_.count(), top[0]->cpu_data(), 
              previous_.mutable_cpu_data());
+  
+  const Dtype* end_mark = bottom[1]->cpu_data();
+  int dim = previous_.count() / previous_.num();
+  for (int i = 0; i < bottom[1]->count(); ++i) {
+    if (end_mark[i] > 0.5) {
+      caffe_set(dim, Dtype(0), 
+                previous_.mutable_cpu_data() + previous_.offset(i));
+    }
+  }
 
 }
 

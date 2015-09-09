@@ -112,6 +112,7 @@ class ConvolutionRNNLayerTest : public MultiDeviceTest<TypeParam> {
  protected:
   ConvolutionRNNLayerTest()
       : blob_bottom_(new Blob<Dtype>(2, 3, 6, 4)),
+      end_mark_(new Blob<Dtype>(2, 1, 1, 1)),
       previous_(new Blob<Dtype>()),
       previous_out_(new Blob<Dtype>()),
       blob_top_(new Blob<Dtype>()) {}
@@ -122,11 +123,13 @@ class ConvolutionRNNLayerTest : public MultiDeviceTest<TypeParam> {
     GaussianFiller<Dtype> filler(filler_param);
     filler.Fill(this->blob_bottom_);
     blob_bottom_vec_.push_back(blob_bottom_);
+    blob_bottom_vec_.push_back(end_mark_);
     blob_top_vec_.push_back(blob_top_);
   }
 
   virtual ~ConvolutionRNNLayerTest() {
     delete blob_bottom_;
+    delete end_mark_;
     delete blob_top_;
     delete previous_;
     delete previous_out_;
@@ -170,6 +173,7 @@ class ConvolutionRNNLayerTest : public MultiDeviceTest<TypeParam> {
   }
 
   Blob<Dtype>* const blob_bottom_;
+  Blob<Dtype>* const end_mark_;
   Blob<Dtype>* const previous_;
   Blob<Dtype>* const previous_out_;
   Blob<Dtype>* const blob_top_;
@@ -216,9 +220,7 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
   convolution_param->mutable_bias_filler()->set_value(0.1);
   shared_ptr<Layer<Dtype> > layer(
       new ConvolutionRNNLayer<Dtype>(layer_param));
-  //std::cout << "layer init" << std::endl;
   layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  //std::cout << "layer setup" << std::endl;
   layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   /*
   for (int i=0; i<4; ++i){
@@ -235,22 +237,16 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
   caffe_conv(this->blob_bottom_, convolution_param, layer->blobs()[0], 
              layer->blobs()[2],
              this->MakeReferenceTop(this->blob_top_));
-  //std::cout << "caffe_conv" << std::endl;
   this->previous_->ReshapeLike(*(this->blob_top_));
-  //this->MakeReferenceTop(this->previous_);
-  //std::cout << "caffe reshape" << std::endl;
   caffe_set(this->previous_->count(), Dtype(0), 
             this->previous_->mutable_cpu_data());
-  //std::cout << "caffe_set" << std::endl;
   this->previous_out_->ReshapeLike(*(this->blob_top_));
   caffe_conv(this->previous_, convolution_param, layer->blobs()[1], 
              layer->blobs()[3],
              this->previous_out_);
-  //std::cout << "caffe_conv" << std::endl;
   caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
             this->ref_blob_top_->cpu_data(),
             this->ref_blob_top_->mutable_cpu_data());
-  //std::cout << "caffe_add" << std::endl;
   top_data = this->blob_top_->cpu_data();
   ref_top_data = this->ref_blob_top_->mutable_cpu_data();
 
@@ -261,7 +257,6 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
     EXPECT_NEAR(ref_top_data[i], ((ConvolutionRNNLayer<Dtype>*)layer.get())
                 ->get_previous().cpu_data()[i], 1e-4);
   }
-  //std::cout << "caffe_check" << std::endl;
 
   layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   caffe_copy(this->previous_->count(), this->ref_blob_top_->cpu_data(), 
@@ -272,9 +267,81 @@ TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolution) {
   caffe_conv(this->previous_, convolution_param, layer->blobs()[1], 
              layer->blobs()[3],
              this->previous_out_);
-  //for (int i=0; i < this->previous_out_->count(); ++i) {
-  //EXPECT_NEAR(this->previous_out_->cpu_data()[i], ((ConvolutionRNNLayer<Dtype>*)layer.get()) ->previous_out_.cpu_diff()[i], 1e-4);
-  //}
+  caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
+            this->ref_blob_top_->cpu_data(),
+            this->ref_blob_top_->mutable_cpu_data());
+  top_data = this->blob_top_->cpu_data();
+  ref_top_data = this->ref_blob_top_->mutable_cpu_data();
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    if (ref_top_data[i] < 0)
+      ref_top_data[i] = 0;
+    EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-4);
+  }
+}
+
+TYPED_TEST(ConvolutionRNNLayerTest, TestSimpleConvolutionReset) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->end_mark_->mutable_cpu_data()[1] = 1;
+  LayerParameter layer_param;
+  ConvolutionParameter* convolution_param =
+      layer_param.mutable_convolution_param();
+  convolution_param->set_kernel_size(3);
+  convolution_param->set_stride(1);
+  convolution_param->set_pad(1);
+  convolution_param->set_num_output(4);
+  convolution_param->mutable_weight_filler()->set_type("gaussian");
+  convolution_param->mutable_bias_filler()->set_type("constant");
+  convolution_param->mutable_bias_filler()->set_value(0.1);
+  shared_ptr<Layer<Dtype> > layer(
+      new ConvolutionRNNLayer<Dtype>(layer_param));
+  layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  /*
+  for (int i=0; i<4; ++i){
+    std::cout << "blobs " << i << ": " << layer->blobs()[i]->num() << " "
+        << layer->blobs()[i]->channels() << " "
+        << layer->blobs()[i]->height() << " "
+        << layer->blobs()[i]->width() << std::endl;
+  }
+  std::cout << "layer forward" << std::endl;
+  */
+  // Check against reference convolution.
+  const Dtype* top_data;
+  Dtype* ref_top_data;
+  caffe_conv(this->blob_bottom_, convolution_param, layer->blobs()[0], 
+             layer->blobs()[2],
+             this->MakeReferenceTop(this->blob_top_));
+  this->previous_->ReshapeLike(*(this->blob_top_));
+  caffe_set(this->previous_->count(), Dtype(0), 
+            this->previous_->mutable_cpu_data());
+  this->previous_out_->ReshapeLike(*(this->blob_top_));
+  caffe_conv(this->previous_, convolution_param, layer->blobs()[1], 
+             layer->blobs()[3],
+             this->previous_out_);
+  caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
+            this->ref_blob_top_->cpu_data(),
+            this->ref_blob_top_->mutable_cpu_data());
+  top_data = this->blob_top_->cpu_data();
+  ref_top_data = this->ref_blob_top_->mutable_cpu_data();
+
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    if (ref_top_data[i] < 0)
+      ref_top_data[i] = 0;
+    EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-4);
+  }
+
+  caffe_copy(this->previous_->count(), this->ref_blob_top_->cpu_data(), 
+             this->previous_->mutable_cpu_data());
+  int dim = this->previous_->count() / this->previous_->num();
+  caffe_set(dim, Dtype(0), this->previous_->mutable_cpu_data() 
+            + this->previous_->offset(1));
+  layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  caffe_conv(this->blob_bottom_, convolution_param, layer->blobs()[0], 
+             layer->blobs()[2],
+             this->MakeReferenceTop(this->blob_top_));
+  caffe_conv(this->previous_, convolution_param, layer->blobs()[1], 
+             layer->blobs()[3],
+             this->previous_out_);
   caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
             this->ref_blob_top_->cpu_data(),
             this->ref_blob_top_->mutable_cpu_data());

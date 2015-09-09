@@ -40,6 +40,14 @@ void ConvolutionRNNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
              previous_out_.mutable_gpu_data());
   caffe_copy(previous_.count(), top[0]->gpu_data(), 
              previous_.mutable_gpu_data());
+  const Dtype* end_mark = bottom[1]->cpu_data();
+  int dim = previous_.count() / previous_.num();
+  for (int i = 0; i < bottom[1]->count(); ++i) {
+    if (end_mark[i] > 0.5) {
+      caffe_gpu_set(dim, Dtype(0), 
+                previous_.mutable_cpu_data() + previous_.offset(i));
+    }
+  }
 }
 
 template <typename Dtype>

@@ -93,6 +93,8 @@ void InnerProductRNNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     bias_multiplier_.Reshape(bias_shape);
     caffe_set(M_, Dtype(1), bias_multiplier_.mutable_cpu_data());
   }
+
+  CHECK_EQ(bottom[1]->count(), bottom[0]->num());
 }
 
 template <typename Dtype>
@@ -121,6 +123,14 @@ void InnerProductRNNLayer<Dtype>::Forward_cpu(
              previous_out_.mutable_cpu_data());
   caffe_copy(previous_.count(), top[0]->cpu_data(), 
              previous_.mutable_cpu_data());
+  const Dtype* end_mark = bottom[1]->cpu_data();
+  int dim = previous_.count() / previous_.num();
+  for (int i = 0; i < bottom[1]->count(); ++i) {
+    if (end_mark[i] > 0.5) {
+      caffe_set(dim, Dtype(0), 
+                previous_.mutable_cpu_data() + previous_.offset(i));
+    }
+  }
 }
 
 template <typename Dtype>

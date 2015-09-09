@@ -53,6 +53,7 @@ class InnerProductRNNLayerTest : public MultiDeviceTest<TypeParam> {
         previous_(new Blob<Dtype>()),
         previous_out_(new Blob<Dtype>()),
         ref_blob_top_(new Blob<Dtype>()),
+        end_mark_(new Blob<Dtype>()),
         blob_top_(new Blob<Dtype>()) {
     // fill the values
     FillerParameter filler_param;
@@ -66,6 +67,7 @@ class InnerProductRNNLayerTest : public MultiDeviceTest<TypeParam> {
     delete blob_top_;
     delete previous_;
     delete previous_out_;
+    delete end_mark_;
   }
 
   virtual Dtype GetObjAndGradient(const Layer<Dtype>& layer,
@@ -100,6 +102,7 @@ class InnerProductRNNLayerTest : public MultiDeviceTest<TypeParam> {
   }
 
   Blob<Dtype>* const blob_bottom_;
+  Blob<Dtype>* const end_mark_;
   Blob<Dtype>* const blob_bottom_nobatch_;
   Blob<Dtype>* const blob_top_;
   Blob<Dtype>* const previous_;
@@ -114,6 +117,8 @@ TYPED_TEST_CASE(InnerProductRNNLayerTest, TestDtypesAndDevices);
 TYPED_TEST(InnerProductRNNLayerTest, TestSetUp) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.push_back(this->blob_bottom_);
+  this->end_mark_->Reshape(2, 1, 1, 1);
+  this->blob_bottom_vec_.push_back(this->end_mark_);
   LayerParameter layer_param;
   InnerProductParameter* inner_product_param =
       layer_param.mutable_inner_product_param();
@@ -130,6 +135,8 @@ TYPED_TEST(InnerProductRNNLayerTest, TestSetUp) {
 TYPED_TEST(InnerProductRNNLayerTest, TestForward) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.push_back(this->blob_bottom_);
+  this->end_mark_->Reshape(2, 1, 1, 1);
+  this->blob_bottom_vec_.push_back(this->end_mark_);
   bool IS_VALID_CUDA = false;
 #ifndef CPU_ONLY
   IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
@@ -191,9 +198,80 @@ TYPED_TEST(InnerProductRNNLayerTest, TestForward) {
   }
 }
 
+TYPED_TEST(InnerProductRNNLayerTest, TestForwardReset) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_);
+  this->end_mark_->Reshape(2, 1, 1, 1);
+  (this->end_mark_->mutable_cpu_data())[1] = 1;
+  this->blob_bottom_vec_.push_back(this->end_mark_);
+  bool IS_VALID_CUDA = false;
+#ifndef CPU_ONLY
+  IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
+#endif
+  if (Caffe::mode() == Caffe::CPU ||
+      sizeof(Dtype) == 4 || IS_VALID_CUDA) {
+    LayerParameter layer_param;
+    InnerProductParameter* inner_product_param =
+        layer_param.mutable_inner_product_param();
+    inner_product_param->set_num_output(10);
+    inner_product_param->mutable_weight_filler()->set_type("gaussian");
+    inner_product_param->mutable_bias_filler()->set_type("gaussian");
+    shared_ptr<InnerProductRNNLayer<Dtype> > layer(
+        new InnerProductRNNLayer<Dtype>(layer_param));
+    layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    this->previous_->ReshapeLike(*(this->blob_top_));
+    this->previous_out_->ReshapeLike(*(this->blob_top_));
+    this->ref_blob_top_->ReshapeLike(*(this->blob_top_));
+    FillerParameter filler_param;
+    GaussianFiller<Dtype> filler(filler_param);
+    filler.Fill(this->previous_);
+    Blob<Dtype> &layer_previous = layer->GetPrevious();
+    caffe_copy(this->previous_->count(), this->previous_->cpu_data(), 
+               layer_previous.mutable_cpu_data());
+    layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    InnerProduct(*(this->blob_bottom_), *(layer->blobs()[0]), 
+                 *(this->ref_blob_top_), layer->blobs()[2].get());
+    InnerProduct(*(this->previous_), *(layer->blobs()[1]),
+                 *(this->previous_out_));
+    caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
+              this->ref_blob_top_->cpu_data(), 
+              this->ref_blob_top_->mutable_cpu_data());
+    const Dtype* top_data = this->blob_top_->cpu_data();
+    Dtype* ref_top_data = this->ref_blob_top_->mutable_cpu_data();
+    const int count = this->blob_top_->count();
+    for (int i = 0; i < count; ++i) {
+      if (ref_top_data[i] < 0)
+        ref_top_data[i] = 0;
+      EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-5);
+    }
+    this->previous_->CopyFrom(*(this->blob_top_));
+    int dim = this->previous_->count() / this->previous_->num();
+    caffe_set(dim, Dtype(0), this->previous_->mutable_cpu_data() 
+              + this->previous_->offset(1));
+    layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    InnerProduct(*(this->blob_bottom_), *(layer->blobs()[0]), 
+                 *(this->ref_blob_top_), layer->blobs()[2].get());
+    InnerProduct(*(this->previous_), *(layer->blobs()[1]),
+                 *(this->previous_out_));
+    caffe_add(this->previous_->count(), this->previous_out_->cpu_data(),
+              this->ref_blob_top_->cpu_data(), 
+              this->ref_blob_top_->mutable_cpu_data());
+    top_data = this->blob_top_->cpu_data();
+    ref_top_data = this->ref_blob_top_->mutable_cpu_data();
+    for (int i = 0; i < count; ++i) {
+      if (ref_top_data[i] < 0)
+        ref_top_data[i] = 0;
+      EXPECT_NEAR(top_data[i], ref_top_data[i], 1e-5);
+    }
+  } else {
+    LOG(ERROR) << "Skipping test due to old architecture.";
+  }
+}
 TYPED_TEST(InnerProductRNNLayerTest, TestNoBatchForward) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.push_back(this->blob_bottom_nobatch_);
+  this->end_mark_->Reshape(1, 1, 1, 1);
+  this->blob_bottom_vec_.push_back(this->end_mark_);
   bool IS_VALID_CUDA = false;
 #ifndef CPU_ONLY
   IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
@@ -256,7 +334,9 @@ TYPED_TEST(InnerProductRNNLayerTest, TestNoBatchForward) {
 
 TYPED_TEST(InnerProductRNNLayerTest, TestGradient) {
   typedef typename TypeParam::Dtype Dtype;
+  this->end_mark_->Reshape(2, 1, 1, 1);
   this->blob_bottom_vec_.push_back(this->blob_bottom_);
+  this->blob_bottom_vec_.push_back(this->end_mark_);
   bool IS_VALID_CUDA = false;
 #ifndef CPU_ONLY
   IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
