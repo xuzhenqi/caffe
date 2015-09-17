@@ -37,7 +37,7 @@ class ImageDataRNNLayerTest : public MultiDeviceTest<TypeParam> {
     Caffe::set_random_seed(seed_);
     // TODO: make the test source available in test dir.
     source_ = string("/mnt/dataset3/small/source.txt");
-    root_dir_ = string("/mnt/dataset3/small/");
+    root_dir_ = string("/mnt/dataset3/small/UCF-101/");
   }
   
   int seed_;

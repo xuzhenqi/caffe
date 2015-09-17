@@ -34,7 +34,7 @@ inline void shuffle(RandomAccessIterator begin, RandomAccessIterator end,
     dist_type dist(0, i);
     temp = dist(*gen);
     for (int j = 0; j < num; ++j){
-      std::cout << i*num + j << " " << temp * num + j << std::endl;
+      //std::cout << i*num + j << " " << temp * num + j << std::endl;
       std::iter_swap(begin + i*num + j, begin + temp * num + j);
     }
   }

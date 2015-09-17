@@ -241,29 +241,29 @@ class ConvolutionRNNLayer : public BaseConvolutionLayer<Dtype> {
  private:
   // wrap im2col/col2im so we don't have to remember the (long) argument lists
   inline void conv_im2col_rnn_cpu(const Dtype* data, Dtype* col_buff) {
-    im2col_cpu(data, conv_in_channels_previous_, this->conv_in_height_, 
-        this->conv_in_width_,
+    im2col_cpu(data, conv_in_channels_previous_, this->height_out_, 
+        this->width_out_,
         this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
-        this->stride_h_, this->stride_w_, col_buff);
+        1, 1, col_buff);
   }
   inline void conv_col2im_rnn_cpu(const Dtype* col_buff, Dtype* data) {
-    col2im_cpu(col_buff, conv_in_channels_previous_, this->conv_in_height_, 
-        this->conv_in_width_,
+    col2im_cpu(col_buff, conv_in_channels_previous_, this->height_out_, 
+        this->width_out_,
         this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
-        this->stride_h_, this->stride_w_, data);
+        1, 1, data);
   }
 #ifndef CPU_ONLY
   inline void conv_im2col_rnn_gpu(const Dtype* data, Dtype* col_buff) {
-    im2col_gpu(data, conv_in_channels_previous_, this->conv_in_height_, 
-        this->conv_in_width_,
+    im2col_gpu(data, conv_in_channels_previous_, this->height_out_, 
+        this->width_out_,
         this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
-        this->stride_h_, this->stride_w_, col_buff);
+        1, 1, col_buff);
   }
   inline void conv_col2im_rnn_gpu(const Dtype* col_buff, Dtype* data) {
-    col2im_gpu(col_buff, conv_in_channels_previous_, this->conv_in_height_, 
-        this->conv_in_width_,
+    col2im_gpu(col_buff, conv_in_channels_previous_, this->height_out_, 
+        this->width_out_,
         this->kernel_h_, this->kernel_w_, this->pad_h_, this->pad_w_, 
-        this->stride_h_, this->stride_w_, data);
+        1, 1, data);
   }
 #endif
 

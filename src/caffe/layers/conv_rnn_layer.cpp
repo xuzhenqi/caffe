@@ -76,13 +76,12 @@ void ConvolutionRNNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   // - blobs_[0] holds the filter weights
   // - blobs_[1] holds the filter weights between time steps
   // - blobs_[2] holds the biases (optional)
-  // - blobs_[3] holds the biases between time steps (optional)
   this->bias_term_ = this->layer_param_.convolution_param().bias_term();
   if (this->blobs_.size() > 0) {
     LOG(INFO) << "Skipping parameter initialization";
   } else {
     if (this->bias_term_) {
-      this->blobs_.resize(4);
+      this->blobs_.resize(3);
     } else {
       this->blobs_.resize(2);
     }
@@ -102,11 +101,9 @@ void ConvolutionRNNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     if (this->bias_term_) {
       vector<int> bias_shape(1, this->num_output_);
       this->blobs_[2].reset(new Blob<Dtype>(bias_shape));
-      this->blobs_[3].reset(new Blob<Dtype>(bias_shape));
       shared_ptr<Filler<Dtype> > bias_filler(GetFiller<Dtype>(
           this->layer_param_.convolution_param().bias_filler()));
       bias_filler->Fill(this->blobs_[2].get());
-      bias_filler->Fill(this->blobs_[3].get());
     }
   }
   // Propagate gradients to the parameters (as directed by backward pass).
@@ -127,8 +124,6 @@ void ConvolutionRNNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // Shape the tops.
   compute_output_shape();
   // Only do the same size convolution
-  CHECK_EQ(this->height_, this->height_out_);
-  CHECK_EQ(this->width_, this->width_out_);
   top[0]->Reshape(this->num_, this->num_output_, this->height_out_, 
                   this->width_out_);
   previous_out_.Reshape(this->num_, this->num_output_, this->height_out_, 
@@ -331,10 +326,6 @@ void ConvolutionRNNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   for (int n = 0; n < this->num_; ++n) {
     this->forward_rnn_cpu_gemm(bottom_data + previous_.offset(n), weight,
         top_data + previous_out_.offset(n));
-    if (this->bias_term_) {
-      const Dtype* bias = this->blobs_[3]->cpu_data();
-      this->forward_cpu_bias(top_data + previous_out_.offset(n), bias);
-    }
   }
   caffe_add(previous_.count(), previous_out_.cpu_data(), top[0]->cpu_data(),
             top[0]->mutable_cpu_data());
@@ -391,13 +382,6 @@ void ConvolutionRNNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   weight_diff = this->blobs_[1]->mutable_cpu_diff();
   top_diff = top[0]->cpu_diff();
   bottom_data = previous_out_.cpu_data();
-  // Bias gradient, if necessary.
-  if (this->bias_term_ && this->param_propagate_down_[3]) {
-    Dtype* bias_diff = this->blobs_[3]->mutable_cpu_diff();
-    for (int n = 0; n < this->num_; ++n) {
-      this->backward_cpu_bias(bias_diff, top_diff + top[0]->offset(n));
-    }
-  }
   if (this->param_propagate_down_[1] || propagate_down[0]) {
     for (int n = 0; n < this->num_; ++n) {
       // gradient w.r.t. weight. Note that we will accumulate diffs.
@@ -414,5 +398,6 @@ STUB_GPU(ConvolutionRNNLayer);
 #endif
 
 INSTANTIATE_CLASS(ConvolutionRNNLayer);
+REGISTER_LAYER_CLASS(ConvolutionRNN);
 
 }  // namespace caffe

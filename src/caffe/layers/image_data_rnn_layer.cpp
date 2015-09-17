@@ -177,8 +177,8 @@ void ImageDataRNNLayer<Dtype>::InternalThreadEntry() {
   DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
   DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
   DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
-  std::cout << filename << "\t\t\t" << prefetch_label[4] << "\t\t\t"
-      << current_frame_[4] << "\t\t\t" << prefetch_end_mark[4] << std::endl;
+  //std::cout << filename << "\t\t\t" << prefetch_label[4] << "\t\t\t"
+  //    << current_frame_[4] << "\t\t\t" << prefetch_end_mark[4] << std::endl;
 
 }
 

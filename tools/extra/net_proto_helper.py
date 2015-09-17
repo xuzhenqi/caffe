@@ -1,17 +1,22 @@
 import copy
 
-
 class Atom:
-    def __init__(self, title, value, isstring = False):
+    def __init__(self, title, value):
         self.title = title
         self.value = value
-        self.isstring = isstring
+        self.isstring = isinstance(value, str) 
 
     def display(self, level):
         string = level * "  " + self.title + ": "
         if self.isstring:
             string += "\""
-        string += str(self.value)
+        if isinstance(self.value, bool):
+            if self.value:
+                string += "true"
+            else:
+                string += 'false'
+        else:
+            string += str(self.value)
         if self.isstring:
             string += "\""
         string += "\n"
@@ -25,10 +30,28 @@ class Compound:
     def initial(self, kwargs):
         for key in self.__titles__:
             # self.name = []
-            # if 'name' in kwargs.keys(): self.name = kwargs['name']
+            # if 'name' in kwargs.keys(): self.name = Atom('name', kwargs['name'])
             exec("self." + key + " = []");
-            exec("if '" + key + "' in kwargs.keys(): self." + key +
-                 " = copy.deepcopy(kwargs['" + key + "'])")
+            if key in kwargs.keys():
+                self.set(key, kwargs[key])
+    
+    def set(self, key, value):
+        if key not in self.__titles__:
+            print "[Warning] %s is not a valid field" % key
+        else:
+            exec("if isinstance(value, list):\n" +
+                 "  for v in value:\n" +
+                 "    if isinstance(v, Compound):\n" +
+                 "      self.%s += [v]\n" % key + 
+                 "    else:\n" +
+                 "      self.%s += [Atom('%s', v)]\n" % (key, key) +
+                 "else:\n" +
+                 "  if isinstance(value, Compound):\n" +
+                 "    self.%s = value\n" % key + 
+                 "  else:\n" +
+                 "    self.%s = Atom('%s', value)\n" % (key, key))
+        
+
 
     def display(self, level=0):
         string = " {\n"
@@ -36,9 +59,13 @@ class Compound:
         for key in self.__titles__:
             # for v in self.name:
             #     string += v.display(level)
-            exec("for v in self." + key + ":\n  if not isinstance(v, Atom):"
-                                          "\n    string += level * '  ' + '"
-                 + key + "'\n  string += v.display(level)")
+            exec("if not isinstance(self.%s, list):\n" % key +
+                 "  self.%s = [self.%s]\n" % (key, key) +
+                 "for v in self.%s:\n" % key +
+                 "  if not isinstance(v, Atom):\n" +
+                 "    string += level * '  ' + '%s'\n" % key + 
+                 "  string += v.display(level)\n"
+                 )
         string += (level - 1) * "  " + "}\n"
         return string
 
@@ -51,7 +78,7 @@ class ParamSpec(Compound):
         self.decay_mult = [Atom('decay_mult', decay_mult)]
 
     def set_name(self, name):
-        self.name = [Atom('name', name, True)]
+        self.name = [Atom('name', name)]
 
 
 class BlobProto(Compound):
@@ -115,18 +142,11 @@ class ConvolutionParam(Compound):
 
 
 class FillerParameter(Compound):
-    def __init__(self, type, *args, **kwargs):
+    def __init__(self, type, **kwargs):
         self.__titles__ = ['type', 'value', 'min', 'max', 'mean', 'std',
                            'sparse']
         self.initial(kwargs)
-        self.type = [Atom('type', type, True)]
-        if type == 'constant':
-            self.value = [Atom('value', args[0])]
-        elif type == 'xavier':
-            None
-        else:
-            print type, 'filler not implented'
-            exit(0)
+        self.type = [Atom('type', type)]
 
 
 class DataParameter(Compound):
@@ -149,9 +169,9 @@ class ImageDataParameter(Compound):
                            'new_height', 'new_width', 'is_color', 'scale',
                            'mean_file', 'crop_size', 'mirror', 'root_folder']
         self.initial(kwargs)
-        self.source = [Atom('source', source, True)]
+        self.source = [Atom('source', source)]
         self.batch_size = [Atom('batch_size', batch_size)]
-        self.root_folder = [Atom('root_folder', root_folder, True)]
+        self.root_folder = [Atom('root_folder', root_folder)]
 
 
 class InnerProductParameter(Compound):
@@ -211,7 +231,7 @@ class TripletLossParameter(Compound):
 class TripletImageDataParameter(Compound):
     def __init__(self, statics=''):
         self.__titles__ = ['statics']
-        self.statics = [Atom('statics', statics, True)]
+        self.statics = [Atom('statics', statics)]
 
 
 class LayerParameter(Compound):
@@ -225,20 +245,20 @@ class LayerParameter(Compound):
                            'lstm_param', 'pooling_param', 'relu_param',
                            'triplet_loss_param', 'triplet_image_data_param']
         self.initial(kwargs)
-        self.type = [Atom('type', type, True)]
+        self.type = [Atom('type', type)]
 
     def set_name(self, name):
-        self.name = [Atom('name', name, True)]
+        self.name = [Atom('name', name)]
 
     def set_bottom(self, bottom=[]):
         self.bottom = []
         for i in bottom:
-            self.bottom.append(Atom('bottom', i, True))
+            self.bottom.append(Atom('bottom', i))
 
     def set_top(self, top=[]):
         self.top = []
         for i in top:
-            self.top.append(Atom('top', i, True))
+            self.top.append(Atom('top', i))
 
 
 class NetParameter(Compound):
@@ -254,6 +274,12 @@ class NetState(Compound):
         self.__titles__ = ['phase', 'level', 'stage']
         self.initial(kwargs)
 
+class Enum:
+    def __init__(self, value):
+        self.value = value
+    
+    def __str__(self):
+        return self.value
 
 class Block():
     def __init__(self):
@@ -271,21 +297,19 @@ def display(layers):
 
 
 class Fully_relu(Block):
-    def __init__(self, name='', bottom='', top='', num_output=0):
+    def __init__(self, name, bottom, top, inner_param, param=[param_1_1, param_2_0]):
         self.name = name
         self.bottom = bottom
         self.top = top
-        self.num_output = num_output
+        self.inner_param = inner_param
+        self.param = param
         self.change()
         self.__layers__ = [self.inner, self.relu]
 
     def change(self):
-        inner_product_param = InnerProductParameter(self.num_output,
-                weight_filler = [filler_xavier_0_1],
-                bias_filler = [filler_constant_0_2])
         self.inner = LayerParameter('InnerProduct', 
-                param = [param_1_1, param_2_0],
-                inner_product_param=[inner_product_param])
+                param = self.param,
+                inner_product_param=[self.inner_product_param])
         self.inner.set_name(self.name + '/inner_product')
         self.inner.set_bottom([self.bottom])
         self.inner.set_top([self.top])
@@ -309,23 +333,23 @@ class Fully_relu(Block):
         self.relu.set_bottom([self.top])
         self.relu.set_top([self.top])
     
+param_1_1 = ParamSpec(1, 1)
+param_2_0 = ParamSpec(2, 0)
 
 class Conv_relu(Block):
-    def __init__(self, name='', bottom='', top='', param=[]):
+    def __init__(self, name, bottom, top, conv_param, 
+            param=[param_1_1, param_2_0]):
         self.name = name
         self.bottom = bottom
         self.top = top
+        self.conv_param = conv_param
         self.param = param
         self.change()
         self.__layers__ = [self.conv, self.relu]
     def change(self):
-        conv_param = ConvolutionParam(self.param[0], self.param[1],
-                                      self.param[2], self.param[3],
-                                      weight_filler = [filler_xavier_0_1],
-                                      bias_filler = [filler_constant_0_2])
         self.conv = LayerParameter('Convolution',
-                        param = [param_1_1, param_2_0],
-                        convolution_param =[conv_param])
+                        param=self.param,
+                        convolution_param=self.conv_param)
         self.conv.set_name(self.name + '/conv')
         self.conv.set_bottom([self.bottom])
         self.conv.set_top([self.top])
@@ -415,10 +439,8 @@ class Inception(Block):
             self.__layers__ += self.c5x5_relu.__layers__
             self.concat_bottom.append(self.name + '/c5x5')
         if self.pool_param:
-            pool_param = PoolingParameter(self.pool_param[0], self.pool_param[1],
-                                          self.pool_param[2], self.pool_param[3])
             self.pool_layer = LayerParameter('Pooling',
-                                             pooling_param = [pool_param])
+                                             pooling_param = self.pool_param)
             self.pool_layer.set_name(self.name + '/pool')
             self.pool_layer.set_bottom([self.bottom])
             self.pool_layer.set_top([self.name + '/pool'])
@@ -506,140 +528,138 @@ def copy_layers(layers=[], suffix1='', suffix2='_2', share_param=False):
             i.set_top(top)
     return (layers, cp_layers)
 
-dataset = '/mnt/dataset2/CASIAWebFace/'
-image_data_param = ImageDataParameter(dataset + 'filelist_crop.txt',
-                                      60,
-                                      dataset + 'casia_crop/')
-triplet_image_data_param = TripletImageDataParameter(
-    dataset + 'identities.txt')
-param_1_1 = ParamSpec(1, 1)
-param_2_0 = ParamSpec(2, 0)
-filler_constant_0_2 = FillerParameter('constant', 0.2)
-filler_xavier_0_1 = FillerParameter('xavier', 0.1)
-convolution_param_64_1_3_1 = ConvolutionParam(64, 1, 3, 1)
-convolution_param_64_0_1_1 = ConvolutionParam(64, 0, 1, 1)
-pooling_param_max_3_2 = PoolingParameter('MAX', 3, 2)
-lrn_param_5_0_0001_0_75 = LRNParameter(5, 0.0001, 0.75)
-
-if __name__ == '__main__':
-    # image_data_layer
-    triplet_image_data_layer = LayerParameter('TripletImageData',
-                    image_data_param = [image_data_param],
-                    triplet_image_data_param = [triplet_image_data_param])
-    triplet_image_data_layer.set_name('triplet_data_layer')
-    triplet_image_data_layer.set_top(['data_1', 'data_2', 'data_3'])
-    
-    googlenet_layers = []
-    #print triplet_image_data_layer.display(0)
-    conv1 = Conv_relu('conv1', 'data', 'conv1', param=[64, 1, 3, 1])
-    googlenet_layers += conv1.__layers__
-    #print conv1.display()
-    max_pool_layer = LayerParameter('Pooling',
-            pooling_param = [pooling_param_max_3_2])
-    max_pool_layer.set_name('max_pool')
-    max_pool_layer.set_bottom(['conv1'])
-    max_pool_layer.set_top(['max_pool'])
-    googlenet_layers.append(max_pool_layer)
-    #print max_pool_layer.display(0)
-    lrn_layer = LayerParameter('LRN', lrn_param = [lrn_param_5_0_0001_0_75])
-    lrn_layer.set_name('lrn')
-    lrn_layer.set_bottom(['max_pool'])
-    lrn_layer.set_top(['lrn'])
-    googlenet_layers.append(lrn_layer)
-    #print lrn_layer.display(0)
-    inception2_3x3_r = Conv_relu('inception2/c3x3_r', 'lrn', 
-            'inception2/c3x3_r', param=[64, 0, 1, 1])
-    inception2_3x3 = Conv_relu('inception2/c3x3', 'inception2/c3x3_r',
-            'inception2', param=[192, 1, 3, 1])
-    googlenet_layers += inception2_3x3_r.__layers__ + inception2_3x3.__layers__
-    #print inception2_3x3_r.display()
-    #print inception2_3x3.display()
-    lrn2_layer = LayerParameter('LRN', lrn_param = [lrn_param_5_0_0001_0_75])
-    lrn2_layer.set_name('lrn2')
-    lrn2_layer.set_bottom(['inception2'])
-    lrn2_layer.set_top(['lrn2'])
-    googlenet_layers.append(lrn2_layer)
-    #print lrn2_layer.display(0)
-    max_pool2_layer = LayerParameter('Pooling',
-                                   pooling_param = [pooling_param_max_3_2])
-    max_pool2_layer.set_name('max_pool2')
-    max_pool2_layer.set_bottom(['lrn2'])
-    max_pool2_layer.set_top(['max_pool2'])
-    googlenet_layers.append(max_pool2_layer)
-    #print max_pool2_layer.display(0)
-    inception_3a = Inception('inception_3a', 'max_pool2', 'inception_3a',
-                             [[64, 0, 1, 1], [96, 0, 1, 1], [128, 1, 3, 1],
-                             [16, 0, 1, 1], [32, 2, 5, 1], ['MAX', 3, 1, 1],
-                             [32, 0, 1, 1]])
-    inception_3b = Inception('inception_3b', 'inception_3a', 'inception_3b',
-                             [[64, 0, 1, 1], [96, 0, 1, 1], [128, 1, 3, 1],
-                             [16, 0, 1, 1], [32, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [64, 0, 1, 1]])
-    inception_3c = Inception('inception_3c', 'inception_3b', 'inception_3c',
-                             [None, [128, 0, 1, 1], [256, 1, 3, 2],
-                             [32, 0, 1, 1], [64, 2, 5, 2], ['MAX', 3, 2, 0],
-                             None])
-    googlenet_layers += inception_3a.__layers__ + inception_3b.__layers__ +\
-        inception_3c.__layers__ 
-    #print inception_3c.display()
-    inception_4a = Inception('inception_4a', 'inception_3c', 'inception_4a',
-                             [[256, 0, 1, 1], [96, 0, 1, 1], [192, 1, 3, 1],
-                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    inception_4b = Inception('inception_4b', 'inception_4a', 'inception_4b',
-                             [[224, 0, 1, 1], [112, 0, 1, 1], [224, 1, 3, 1],
-                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    inception_4c = Inception('inception_4c', 'inception_4b', 'inception_4c',
-                             [[192, 0, 1, 1], [128, 0, 1, 1], [256, 1, 3, 1],
-                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    inception_4d = Inception('inception_4d', 'inception_4c', 'inception_4d',
-                             [[160, 0, 1, 1], [144, 0, 1, 1], [288, 1, 3, 1],
-                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    inception_4e = Inception('inception_4e', 'inception_4d', 'inception_4e',
-                             [None, [160, 0, 1, 1], [256, 1, 3, 2],
-                             [64, 0, 1, 1], [128, 2, 5, 2], ['MAX', 3, 2, 0],
-                             None])
-
-    googlenet_layers += inception_4a.__layers__ + inception_4b.__layers__ +\
-        inception_4c.__layers__ + inception_4d.__layers__ + \
-        inception_4e.__layers__ 
-    inception_5a = Inception('inception_5a', 'inception_4e', 'inception_5a',
-                             [[384, 0, 1, 1], [192, 0, 1, 1], [384, 1, 3, 1],
-                             [48, 0, 1, 1], [182, 2, 5, 1], ['L2NORM', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    inception_5b = Inception('inception_5b', 'inception_5a', 'inception_5b',
-                             [[384, 0, 1, 1], [192, 0, 1, 1], [384, 1, 3, 1],
-                             [48, 0, 1, 1], [182, 2, 5, 1], ['MAX', 3, 1, 1],
-                             [128, 0, 1, 1]])
-    googlenet_layers += inception_5a.__layers__ + inception_5b.__layers__
-    avg_pool_param = PoolingParameter('AVE', 6, 1)
-    #print avg_pool_param.display(0)
-    avg_pool_layer = LayerParameter('Pooling', 
-            pooling_param = [avg_pool_param])
-    avg_pool_layer.set_name('avg_pool')
-    avg_pool_layer.set_bottom(['inception_5b'])
-    avg_pool_layer.set_top(['avg_pool'])
-    googlenet_layers.append(avg_pool_layer)
-    #print avg_pool_layer.display(0)
-    fully_conn = Fully_relu('fully_conn', 'avg_pool', 'fully_conn', 128)
-    googlenet_layers += fully_conn.__layers__
-    #print fully_conn.display()
-   
-    (googlenet_layers, googlenet_1) = copy_layers(googlenet_layers, '', '_1', True)
-    (googlenet_layers, googlenet_2) = copy_layers(googlenet_layers, '', '_2', True)
-    (googlenet_layers, googlenet_3) = copy_layers(googlenet_layers, '', '_3', True)
-    #print inception_3a.display()
-    #print display(Inception_3a_2)
-    triplet_loss_param = TripletLossParameter(0.4)
-    triplet_loss_layer = LayerParameter('TripletLoss',
-            triplet_loss_param = [triplet_loss_param])
-    triplet_loss_layer.set_name('triplet_loss')
-    triplet_loss_layer.set_bottom(['fully_conn_1', 'fully_conn_2', 'fully_conn_3'])
-    triplet_loss_layer.set_top(['loss'])
-    #print triplet_loss_layer.display(0)
-    print display([triplet_image_data_layer] + googlenet_1 + googlenet_2 + googlenet_3\
-            + [triplet_loss_layer])
-
+#dataset = '/mnt/dataset2/CASIAWebFace/'
+#image_data_param = ImageDataParameter(dataset + 'filelist_crop.txt',
+#                                      60,
+#                                      dataset + 'casia_crop/')
+#triplet_image_data_param = TripletImageDataParameter(
+#    dataset + 'identities.txt')
+filler_constant_0_2 = FillerParameter('constant', value=0.2)
+filler_xavier = FillerParameter('xavier')
+#convolution_param_64_1_3_1 = ConvolutionParam(64, 1, 3, 1)
+#convolution_param_64_0_1_1 = ConvolutionParam(64, 0, 1, 1)
+#pooling_param_max_3_2 = PoolingParameter('MAX', 3, 2)
+#lrn_param_5_0_0001_0_75 = LRNParameter(5, 0.0001, 0.75)
+#
+#if __name__ == '__main__':
+#    # image_data_layer
+#    triplet_image_data_layer = LayerParameter('TripletImageData',
+#                    image_data_param = [image_data_param],
+#                    triplet_image_data_param = [triplet_image_data_param])
+#    triplet_image_data_layer.set_name('triplet_data_layer')
+#    triplet_image_data_layer.set_top(['data_1', 'data_2', 'data_3'])
+#    
+#    googlenet_layers = []
+#    #print triplet_image_data_layer.display(0)
+#    conv1 = Conv_relu('conv1', 'data', 'conv1', param=[64, 1, 3, 1])
+#    googlenet_layers += conv1.__layers__
+#    #print conv1.display()
+#    max_pool_layer = LayerParameter('Pooling',
+#            pooling_param = [pooling_param_max_3_2])
+#    max_pool_layer.set_name('max_pool')
+#    max_pool_layer.set_bottom(['conv1'])
+#    max_pool_layer.set_top(['max_pool'])
+#    googlenet_layers.append(max_pool_layer)
+#    #print max_pool_layer.display(0)
+#    lrn_layer = LayerParameter('LRN', lrn_param = [lrn_param_5_0_0001_0_75])
+#    lrn_layer.set_name('lrn')
+#    lrn_layer.set_bottom(['max_pool'])
+#    lrn_layer.set_top(['lrn'])
+#    googlenet_layers.append(lrn_layer)
+#    #print lrn_layer.display(0)
+#    inception2_3x3_r = Conv_relu('inception2/c3x3_r', 'lrn', 
+#            'inception2/c3x3_r', param=[64, 0, 1, 1])
+#    inception2_3x3 = Conv_relu('inception2/c3x3', 'inception2/c3x3_r',
+#            'inception2', param=[192, 1, 3, 1])
+#    googlenet_layers += inception2_3x3_r.__layers__ + inception2_3x3.__layers__
+#    #print inception2_3x3_r.display()
+#    #print inception2_3x3.display()
+#    lrn2_layer = LayerParameter('LRN', lrn_param = [lrn_param_5_0_0001_0_75])
+#    lrn2_layer.set_name('lrn2')
+#    lrn2_layer.set_bottom(['inception2'])
+#    lrn2_layer.set_top(['lrn2'])
+#    googlenet_layers.append(lrn2_layer)
+#    #print lrn2_layer.display(0)
+#    max_pool2_layer = LayerParameter('Pooling',
+#                                   pooling_param = [pooling_param_max_3_2])
+#    max_pool2_layer.set_name('max_pool2')
+#    max_pool2_layer.set_bottom(['lrn2'])
+#    max_pool2_layer.set_top(['max_pool2'])
+#    googlenet_layers.append(max_pool2_layer)
+#    #print max_pool2_layer.display(0)
+#    inception_3a = Inception('inception_3a', 'max_pool2', 'inception_3a',
+#                             [[64, 0, 1, 1], [96, 0, 1, 1], [128, 1, 3, 1],
+#                             [16, 0, 1, 1], [32, 2, 5, 1], ['MAX', 3, 1, 1],
+#                             [32, 0, 1, 1]])
+#    inception_3b = Inception('inception_3b', 'inception_3a', 'inception_3b',
+#                             [[64, 0, 1, 1], [96, 0, 1, 1], [128, 1, 3, 1],
+#                             [16, 0, 1, 1], [32, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [64, 0, 1, 1]])
+#    inception_3c = Inception('inception_3c', 'inception_3b', 'inception_3c',
+#                             [None, [128, 0, 1, 1], [256, 1, 3, 2],
+#                             [32, 0, 1, 1], [64, 2, 5, 2], ['MAX', 3, 2, 0],
+#                             None])
+#    googlenet_layers += inception_3a.__layers__ + inception_3b.__layers__ +\
+#        inception_3c.__layers__ 
+#    #print inception_3c.display()
+#    inception_4a = Inception('inception_4a', 'inception_3c', 'inception_4a',
+#                             [[256, 0, 1, 1], [96, 0, 1, 1], [192, 1, 3, 1],
+#                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    inception_4b = Inception('inception_4b', 'inception_4a', 'inception_4b',
+#                             [[224, 0, 1, 1], [112, 0, 1, 1], [224, 1, 3, 1],
+#                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    inception_4c = Inception('inception_4c', 'inception_4b', 'inception_4c',
+#                             [[192, 0, 1, 1], [128, 0, 1, 1], [256, 1, 3, 1],
+#                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    inception_4d = Inception('inception_4d', 'inception_4c', 'inception_4d',
+#                             [[160, 0, 1, 1], [144, 0, 1, 1], [288, 1, 3, 1],
+#                             [32, 0, 1, 1], [64, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    inception_4e = Inception('inception_4e', 'inception_4d', 'inception_4e',
+#                             [None, [160, 0, 1, 1], [256, 1, 3, 2],
+#                             [64, 0, 1, 1], [128, 2, 5, 2], ['MAX', 3, 2, 0],
+#                             None])
+#
+#    googlenet_layers += inception_4a.__layers__ + inception_4b.__layers__ +\
+#        inception_4c.__layers__ + inception_4d.__layers__ + \
+#        inception_4e.__layers__ 
+#    inception_5a = Inception('inception_5a', 'inception_4e', 'inception_5a',
+#                             [[384, 0, 1, 1], [192, 0, 1, 1], [384, 1, 3, 1],
+#                             [48, 0, 1, 1], [182, 2, 5, 1], ['L2NORM', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    inception_5b = Inception('inception_5b', 'inception_5a', 'inception_5b',
+#                             [[384, 0, 1, 1], [192, 0, 1, 1], [384, 1, 3, 1],
+#                             [48, 0, 1, 1], [182, 2, 5, 1], ['MAX', 3, 1, 1],
+#                             [128, 0, 1, 1]])
+#    googlenet_layers += inception_5a.__layers__ + inception_5b.__layers__
+#    avg_pool_param = PoolingParameter('AVE', 6, 1)
+#    #print avg_pool_param.display(0)
+#    avg_pool_layer = LayerParameter('Pooling', 
+#            pooling_param = [avg_pool_param])
+#    avg_pool_layer.set_name('avg_pool')
+#    avg_pool_layer.set_bottom(['inception_5b'])
+#    avg_pool_layer.set_top(['avg_pool'])
+#    googlenet_layers.append(avg_pool_layer)
+#    #print avg_pool_layer.display(0)
+#    fully_conn = Fully_relu('fully_conn', 'avg_pool', 'fully_conn', 128)
+#    googlenet_layers += fully_conn.__layers__
+#    #print fully_conn.display()
+#   
+#    (googlenet_layers, googlenet_1) = copy_layers(googlenet_layers, '', '_1', True)
+#    (googlenet_layers, googlenet_2) = copy_layers(googlenet_layers, '', '_2', True)
+#    (googlenet_layers, googlenet_3) = copy_layers(googlenet_layers, '', '_3', True)
+#    #print inception_3a.display()
+#    #print display(Inception_3a_2)
+#    triplet_loss_param = TripletLossParameter(0.4)
+#    triplet_loss_layer = LayerParameter('TripletLoss',
+#            triplet_loss_param = [triplet_loss_param])
+#    triplet_loss_layer.set_name('triplet_loss')
+#    triplet_loss_layer.set_bottom(['fully_conn_1', 'fully_conn_2', 'fully_conn_3'])
+#    triplet_loss_layer.set_top(['loss'])
+#    #print triplet_loss_layer.display(0)
+#    print display([triplet_image_data_layer] + googlenet_1 + googlenet_2 + googlenet_3\
+#            + [triplet_loss_layer])
+#

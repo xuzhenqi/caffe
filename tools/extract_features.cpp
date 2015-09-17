@@ -1,4 +1,5 @@
 #include <stdio.h>  // for snprintf
+#include <iostream> // for log to stdout
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ int main(int argc, char** argv) {
 template<typename Dtype>
 int feature_extraction_pipeline(int argc, char** argv) {
   ::google::InitGoogleLogging(argv[0]);
-  const int num_required_args = 7;
+  const int num_required_args = 8;
   if (argc < num_required_args) {
     LOG(ERROR)<<
     "This program takes in a trained network and an input data layer, and then"
@@ -40,7 +41,7 @@ int feature_extraction_pipeline(int argc, char** argv) {
     "Usage: extract_features  pretrained_net_param"
     "  feature_extraction_proto_file  extract_feature_blob_name1[,name2,...]"
     "  save_feature_dataset_name1[,name2,...]  num_mini_batches  db_type"
-    "  [CPU/GPU] [DEVICE_ID=0]\n"
+    "  label_blob_name [CPU/GPU] [DEVICE_ID=0] \n"
     "Note: you can extract multiple features in one pass by specifying"
     " multiple feature blob names and dataset names seperated by ','."
     " The names cannot contain white space characters and the number of blobs"
@@ -131,6 +132,13 @@ int feature_extraction_pipeline(int argc, char** argv) {
     shared_ptr<db::Transaction> txn(db->NewTransaction());
     txns.push_back(txn);
   }
+  
+  std::string label_blob_name(argv[++arg_pos]);
+  if (label_blob_name == "no_use_label") {
+    LOG(ERROR) << "Don't use label.";
+  } else if (!feature_extraction_net->has_blob(label_blob_name)) {
+    LOG(FATAL) << label_blob_name << " is not in feature extraction net";
+  }
 
   LOG(ERROR)<< "Extacting Features";
 
@@ -141,6 +149,10 @@ int feature_extraction_pipeline(int argc, char** argv) {
   std::vector<int> image_indices(num_features, 0);
   for (int batch_index = 0; batch_index < num_mini_batches; ++batch_index) {
     feature_extraction_net->Forward(input_vec);
+    shared_ptr<Blob<Dtype> > label_blob;
+    if (label_blob_name != "no_use_label") {
+      label_blob = feature_extraction_net->blob_by_name(label_blob_name);
+    }
     for (int i = 0; i < num_features; ++i) {
       const shared_ptr<Blob<Dtype> > feature_blob = feature_extraction_net
           ->blob_by_name(blob_names[i]);
@@ -158,8 +170,11 @@ int feature_extraction_pipeline(int argc, char** argv) {
         for (int d = 0; d < dim_features; ++d) {
           datum.add_float_data(feature_blob_data[d]);
         }
+        if (label_blob_name != "no_use_label") {
+          datum.set_label(label_blob->cpu_data()[n]);
+        }
         int length = snprintf(key_str, kMaxKeyStrLength, "%010d",
-            image_indices[i]);
+                              image_indices[i]);
         string out;
         CHECK(datum.SerializeToString(&out));
         txns.at(i)->Put(std::string(key_str, length), out);

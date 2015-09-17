@@ -28,10 +28,6 @@ void ConvolutionRNNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   for (int n = 0; n < this->num_; ++n) {
     this->forward_rnn_gpu_gemm(bottom_data + previous_.offset(n), weight,
         top_data + previous_out_.offset(n));
-    if (this->bias_term_) {
-      const Dtype* bias = this->blobs_[3]->gpu_data();
-      this->forward_gpu_bias(top_data + previous_out_.offset(n), bias);
-    }
   }
   caffe_gpu_add(previous_.count(), previous_out_.gpu_data(), top[0]->gpu_data(),
             top[0]->mutable_gpu_data());
@@ -86,13 +82,6 @@ void ConvolutionRNNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   weight_diff = this->blobs_[1]->mutable_gpu_diff();
   top_diff = top[0]->gpu_diff();
   bottom_data = previous_out_.gpu_data();
-  // Bias gradient, if necessary.
-  if (this->bias_term_ && this->param_propagate_down_[3]) {
-    Dtype* bias_diff = this->blobs_[3]->mutable_gpu_diff();
-    for (int n = 0; n < this->num_; ++n) {
-      this->backward_gpu_bias(bias_diff, top_diff + top[0]->offset(n));
-    }
-  }
   if (this->param_propagate_down_[1] || propagate_down[0]) {
     for (int n = 0; n < this->num_; ++n) {
       // gradient w.r.t. weight. Note that we will accumulate diffs.
