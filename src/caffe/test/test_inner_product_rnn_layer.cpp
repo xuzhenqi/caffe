@@ -362,8 +362,8 @@ TYPED_TEST(InnerProductRNNLayerTest, TestGradient) {
     Dtype threshold_ = 0.01;
     for (int i = 0; i < this->blob_top_->count(); ++i) {
       vector<Blob<Dtype>*> blobs_to_check;
-      for (int i = 0; i < layer.blobs().size(); ++i) {
-        Blob<Dtype>* blob = layer.blobs()[i].get();
+      for (int j = 0; j < layer.blobs().size(); ++j) {
+        Blob<Dtype>* blob = layer.blobs()[j].get();
         caffe_set(blob->count(), Dtype(0), blob->mutable_cpu_diff());
         blobs_to_check.push_back(blob);
       }
@@ -426,8 +426,8 @@ TYPED_TEST(InnerProductRNNLayerTest, TestGradient) {
     layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     for (int i = 0; i < this->blob_top_->count(); ++i) {
       vector<Blob<Dtype>*> blobs_to_check;
-      for (int i = 0; i < layer.blobs().size(); ++i) {
-        Blob<Dtype>* blob = layer.blobs()[i].get();
+      for (int j = 0; j < layer.blobs().size(); ++j) {
+        Blob<Dtype>* blob = layer.blobs()[j].get();
         caffe_set(blob->count(), Dtype(0), blob->mutable_cpu_diff());
         blobs_to_check.push_back(blob);
       }
