@@ -77,7 +77,7 @@ void PartitionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   const int C = bottom[0]->channels();
   const int H = bottom[0]->height();
   const int W = bottom[0]->width();
-  int i, j, k, l;
+  int i;
   int tH, tW;
   for (i = 0; i < left_.size(); ++i){
     top_diff = top[i]->gpu_diff();
