@@ -305,7 +305,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 149 
+// LayerParameter next available layer-specific ID: 149
 // (last added: image_data_rnn_param)
 message LayerParameter {
   optional string name = 1; // the layer name

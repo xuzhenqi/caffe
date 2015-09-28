@@ -102,20 +102,13 @@ void ImageDataTwoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom
   this->prefetch_data_[2]->Reshape(label_shape);
 
   fps_ = this->layer_param_.image_data_rnn_param().fps();
-  current_frame_.insert(current_frame_.begin(), batch_size, 1);
+  CHECK(current_frame_.empty());
+  current_frame_.insert(current_frame_.begin(), lines_.size(), 1);
   const unsigned int prefetch_rng_seed = caffe_rng_rand();
   prefetch_rng_.reset(new Caffe::RNG(prefetch_rng_seed));
   caffe::rng_t* prefetch_rng =
       static_cast<caffe::rng_t*>(prefetch_rng_->generator());
-  unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size()));
-  //boost::variate_generator<caffe::rng_t*, boost::uniform_int<int> >
-  //    variate_generator(caffe_rng(), *unifor_gen);
-  current_line_id_.reserve(batch_size);
-  for(int i = 0; i < batch_size; ++i) {
-    current_line_id_.push_back((*unifor_gen)(*prefetch_rng));
-    std::cout << current_line_id_[i] << " ";
-  }
-  std::cout << std::endl;
+  unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size() - 1));
 }
 
 template <typename Dtype>
@@ -133,7 +126,6 @@ void ImageDataTwoLayer<Dtype>::InternalThreadEntry() {
   const int batch_size = image_data_param.batch_size();
   const int new_height = image_data_param.new_height();
   const int new_width = image_data_param.new_width();
-  const int crop_size = this->layer_param_.transform_param().crop_size();
   const bool is_color = image_data_param.is_color();
   string root_folder = image_data_param.root_folder();
   string filename1, filename2;
@@ -142,46 +134,41 @@ void ImageDataTwoLayer<Dtype>::InternalThreadEntry() {
       static_cast<caffe::rng_t*>(prefetch_rng_->generator());
   Dtype* prefetch_label = this->prefetch_data_[2]->mutable_cpu_data();
 
+  int line_id_temp, offset;
+  cv::Mat cv_img;
   for (int i = 0; i < batch_size; ++i) {
+    line_id_temp = (*unifor_gen)(*prefetch_rng);
     // get a blob
     timer.Start();
-    filename1 = root_folder + lines_[current_line_id_[i]].first + "_" +
-        boost::lexical_cast<string>(current_frame_[i]) + ".png";
-    filename2 = root_folder + lines_[current_line_id_[i]].first + "_" +
-            boost::lexical_cast<string>(current_frame_[i] + fps_) + ".png";
-
+    filename1 = root_folder + lines_[line_id_temp].first + "_" +
+        boost::lexical_cast<string>(current_frame_[line_id_temp]) + ".png";
+    filename2 = root_folder + lines_[line_id_temp].first + "_" +
+            boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + ".png";
     // Reading the first image
-    cv::Mat cv_img = ReadImageToCVMat(filename1, new_height,
+    cv_img = ReadImageToCVMat(filename1, new_height,
                                       new_width, is_color);
     CHECK(cv_img.data) << "Could not load " << filename1;
-    read_time += timer.MicroSeconds();
-
     // Apply transformations (mirror, crop...) to the image
-    int offset = this->prefetch_data_[0]->offset(i);
+    offset = this->prefetch_data_[0]->offset(i);
     this->transformed_data_.set_cpu_data(
         prefetch_data_[0]->mutable_cpu_data() + offset);
     this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
-
     // Reading the second image
     cv_img = ReadImageToCVMat(filename2, new_height,
                                       new_width, is_color);
     CHECK(cv_img.data) << "Could not load " << filename2;
     read_time += timer.MicroSeconds();
-
     // Apply transformations (mirror, crop...) to the image
     offset = this->prefetch_data_[1]->offset(i);
     this->transformed_data_.set_cpu_data(
             prefetch_data_[1]->mutable_cpu_data() + offset);
     this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
-
     // Reading label
-    prefetch_label[i] = lines_[current_line_id_[i]].second;
-    current_frame_[i] += fps_;
-    if (current_frame_[i] + fps_ > frames_[current_line_id_[i]]) {
-      current_line_id_[i] = (*unifor_gen)(*prefetch_rng);
-      current_frame_[i] = 1;
+    prefetch_label[i] = lines_[line_id_temp].second;
+    current_frame_[line_id_temp] += fps_;
+    if (current_frame_[line_id_temp] + fps_ > frames_[line_id_temp]) {
+      current_frame_[line_id_temp] = 1;
     }
-
     trans_time += timer.MicroSeconds();
   }
   batch_timer.Stop();

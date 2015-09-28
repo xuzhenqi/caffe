@@ -74,6 +74,8 @@ void WriteProtoToBinaryFile(const Message& proto, const char* filename) {
   CHECK(proto.SerializeToOstream(&output));
 }
 
+
+
 cv::Mat ReadImageToCVMat(const string& filename,
     const int height, const int width, const bool is_color) {
   cv::Mat cv_img;
@@ -141,6 +143,35 @@ bool ReadImageToDatum(const string& filename, const int label,
   } else {
     return false;
   }
+}
+
+
+bool ReadImagesToDatum(const vector<string>& filenames, Datum* datum,
+                      const int height, const int width, const bool is_color) {
+  cv::Mat cv_img;
+  int datum_channels = datum->channels();
+  int datum_height = datum->height();
+  int datum_width = datum->width();
+  int datum_size = datum_channels * datum_height * datum_width;
+  std::string buffer(datum_size, ' ');
+  for (int i = 0; i < filenames.size(); ++i) {
+    cv_img = ReadImageToCVMat(filenames[i], height, width, is_color);
+    CHECK(cv_img.data) << "Cannot read image: " << filenames[i];
+    CHECK_EQ(cv_img.channels() * filenames.size(), datum_channels);
+    CHECK_EQ(cv_img.rows, datum_height);
+    CHECK_EQ(cv_img.cols, datum_width);
+    for (int h = 0; h < datum_height; ++h) {
+      const uchar* ptr = cv_img.ptr<uchar>(h);
+      int img_index = 0;
+      for (int w = 0; w < datum_width; ++w) {
+        for (int c = 0; c < datum_channels; ++c) {
+          int datum_index = ((i*datum_channels + c)* datum_height + h) * datum_width + w;
+          buffer[datum_index] = static_cast<char>(ptr[img_index++]);
+        }
+      }
+    }
+  }
+  datum->set_data(buffer);
 }
 
 bool ReadFileToDatum(const string& filename, const int label,

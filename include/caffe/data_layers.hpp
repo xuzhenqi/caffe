@@ -321,11 +321,44 @@ class ImageDataTwoLayer : public BaseDataLayer<Dtype>, public InternalThread {
   vector<std::pair<std::string, int> > lines_;
   vector<int> frames_;
   vector<int> current_frame_;
-  vector<int> current_line_id_;
   vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
   Blob<Dtype> transformed_data_;
   int lines_id_;
   int fps_;
+};
+
+template <typename Dtype>
+class ImageDataOptLayer : public BaseDataLayer<Dtype>, public InternalThread {
+public:
+    explicit ImageDataOptLayer(const LayerParameter& param)
+            : BaseDataLayer<Dtype>(param) {}
+    virtual ~ImageDataOptLayer();
+    virtual void LayerSetUp(const vector<Blob<Dtype>*> &bottom,
+                            const vector<Blob<Dtype>*> &top);
+    virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                                const vector<Blob<Dtype>*>& top);
+
+    virtual inline const char* type() const { return "ImageDataOpt"; }
+    virtual inline int ExactNumBottomBlobs() const { return 0; }
+    virtual inline int ExactNumTopBlobs() const { return 2; } // Data blobs and label blob
+
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+
+protected:
+    virtual void InternalThreadEntry();
+    shared_ptr<Caffe::RNG> prefetch_rng_;
+    shared_ptr<boost::uniform_int<int> > unifor_gen;
+
+    vector<std::pair<std::string, int> > lines_;
+    vector<int> frames_;
+    vector<int> current_frame_;
+    vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
+    Blob<Dtype> transformed_data_;
+    int lines_id_;
+    int fps_;
 };
 
 template <typename Dtype>
