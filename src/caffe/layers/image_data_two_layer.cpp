@@ -144,25 +144,26 @@ void ImageDataTwoLayer<Dtype>::InternalThreadEntry() {
         boost::lexical_cast<string>(current_frame_[line_id_temp]) + ".png";
     filename2 = root_folder + lines_[line_id_temp].first + "_" +
             boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + ".png";
-    // Reading the first image
-    cv_img = ReadImageToCVMat(filename1, new_height,
-                                      new_width, is_color);
-    CHECK(cv_img.data) << "Could not load " << filename1;
-    // Apply transformations (mirror, crop...) to the image
-    offset = this->prefetch_data_[0]->offset(i);
-    this->transformed_data_.set_cpu_data(
-        prefetch_data_[0]->mutable_cpu_data() + offset);
-    this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
-    // Reading the second image
-    cv_img = ReadImageToCVMat(filename2, new_height,
-                                      new_width, is_color);
-    CHECK(cv_img.data) << "Could not load " << filename2;
-    read_time += timer.MicroSeconds();
-    // Apply transformations (mirror, crop...) to the image
-    offset = this->prefetch_data_[1]->offset(i);
-    this->transformed_data_.set_cpu_data(
-            prefetch_data_[1]->mutable_cpu_data() + offset);
-    this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
+      // Reading the first image
+      cv_img = ReadImageToCVMat(filename1, new_height,
+                                new_width, is_color);
+      CHECK(cv_img.data) << "Could not load " << filename1;
+      // Apply transformations (mirror, crop...) to the image
+      offset = this->prefetch_data_[0]->offset(i);
+      this->transformed_data_.set_cpu_data(
+          prefetch_data_[0]->mutable_cpu_data() + offset);
+      this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
+      // Reading the second image
+      cv_img = ReadImageToCVMat(filename2, new_height,
+                                new_width, is_color);
+      CHECK(cv_img.data) << "Could not load " << filename2;
+      read_time += timer.MicroSeconds();
+      // Apply transformations (mirror, crop...) to the image
+      offset = this->prefetch_data_[1]->offset(i);
+      this->transformed_data_.set_cpu_data(
+          prefetch_data_[1]->mutable_cpu_data() + offset);
+      this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
+
     // Reading label
     prefetch_label[i] = lines_[line_id_temp].second;
     current_frame_[line_id_temp] += fps_;

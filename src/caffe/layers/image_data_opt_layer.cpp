@@ -67,7 +67,7 @@ namespace caffe {
             LOG(FATAL) << "Shuffle is not supported";
         }
         LOG(INFO) << "A total of " << lines_.size() << " videos.";
-        std::cout << "A total of " << lines_.size() << " videos." << std::endl;
+        //std::cout << "A total of " << lines_.size() << " videos." << std::endl;
 
         lines_id_ = 0;
         // Check if we would need to randomly skip a few data points
@@ -131,9 +131,6 @@ namespace caffe {
 
         int line_id_temp, offset;
         Datum datum;
-        datum.set_channels(prefetch_data_[0]->channels());
-        datum.set_width(prefetch_data_[0]->width());
-        datum.set_height(prefetch_data_[0]->height());
         vector<string> filenames(2, "");
         for (int i = 0; i < batch_size; ++i) {
             line_id_temp = (*unifor_gen)(*prefetch_rng);
@@ -158,6 +155,8 @@ namespace caffe {
             }
             trans_time += timer.MicroSeconds();
         }
+        //std::cout << filenames[0] << "\t\t" << filenames[1] << "\t\t" << prefetch_label[4] << "\t\t"
+        //    << current_frame_[4] << "\t\t" << std::endl;
         batch_timer.Stop();
         DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
         DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";

@@ -13,15 +13,17 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
     idp_train = ImageDataParameter('/mnt/dataset3/small/source_01_train.txt',
-                                   64, '/mnt/dataset3/small/UCF-101/')
+                                   128, '/mnt/dataset3/images/optflow/',
+                                   is_color=False)
     idp_test = ImageDataParameter('/mnt/dataset3/small/source_01_test.txt',
-                                  32, '/mnt/dataset3/small/UCF-101/')
+                                  128, '/mnt/dataset3/images/optflow/',
+                                  is_color=False)
     include_train = NetState(phase=Enum('TRAIN'))
     include_test = NetState(phase=Enum('TEST'))
     transform_train = TransformationParameter(mirror=True, crop_size=224,
-                                              mean_value=[104, 117, 123])
+                scale=5./255, mean_value=[127.5, 128.75])
     transform_test = TransformationParameter(mirror=False, crop_size=224,
-                                             mean_value=[104, 117, 123])
+                scale=5./255, mean_value=[127.5, 128.75])
     pooling_param_max_3_2 = PoolingParameter(Enum('MAX'), 3, 2)
     drop_param_0_7 = DropoutParameter(0.7)
     drop_param_0_5 = DropoutParameter(0.5)
@@ -31,15 +33,15 @@ if __name__ == '__main__':
     layers = []
 
     # Image Data
-    image_data_train = LayerParameter('ImageData',
+    image_data_train = LayerParameter('ImageDataOpt',
                                       name='image_data',
-                                      top=['data1', 'label'],
+                                      top=['data', 'label'],
                                       image_data_param=idp_train,
                                       include=include_train,
                                       transform_param=transform_train)
-    image_data_test = LayerParameter('ImageData',
+    image_data_test = LayerParameter('ImageDataOpt',
                                      name='image_data',
-                                     top=['data1', 'label'],
+                                     top=['data', 'label'],
                                      image_data_param=idp_test,
                                      include=include_test,
                                      transform_param=transform_test)
@@ -86,11 +88,11 @@ if __name__ == '__main__':
                param=[param_1_1, param_2_0])
     loss = LayerParameter('SoftmaxWithLoss',
                name='loss',
-               bottom='ip5',
+               bottom=['ip5', 'label'],
                top='loss')
     acc = LayerParameter('Accuracy',
                name='acc',
-               bottom='ip5',
+               bottom=['ip5', 'label'],
                top='acc')
     layers += [ip5, loss, acc]
     print display(layers)
