@@ -405,6 +405,8 @@ message LayerParameter {
 // Message that stores parameters used by ImageDataRNNParameter
 message ImageDataRNNParameter {
   optional uint32 fps = 1 [default = 5];
+  // used for optical flow layer
+  optional string min_max = 2;
 }
 
 // Message that stores parameters used by TripletImageDataLayer

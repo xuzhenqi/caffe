@@ -173,6 +173,7 @@ cv::Mat DecodeDatumToCVMatNative(const Datum& datum);
 cv::Mat DecodeDatumToCVMat(const Datum& datum, bool is_color);
 
 void CVMatToDatum(const cv::Mat& cv_img, Datum* datum);
+void CVMatsToDatum(const vector<cv::Mat>& cv_imgs, Datum* datum);
 
 }  // namespace caffe
 

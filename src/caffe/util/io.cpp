@@ -270,7 +270,35 @@ void CVMatToDatum(const cv::Mat& cv_img, Datum* datum) {
   datum->set_data(buffer);
 }
 
-
-
+void CVMatsToDatum(const vector<cv::Mat>& cv_imgs, Datum* datum) {
+  CHECK(cv_imgs.size() > 0) << "cv_imgs must be large than 0";
+  datum->set_channels(cv_imgs[0].channels() * cv_imgs.size());
+  datum->set_height(cv_imgs[0].rows);
+  datum->set_width(cv_imgs[0].cols);
+  datum->clear_data();
+  datum->clear_float_data();
+  datum->set_encoded(false);
+  int channels = cv_imgs[0].channels();
+  int datum_height = datum->height();
+  int datum_width = datum->width();
+  int datum_size = channels * datum_height * datum_width * cv_imgs.size();
+  datum->mutable_float_data()->Reserve(datum_size);
+  google::protobuf::RepeatedField<float> * buffer= datum->mutable_float_data();
+  for (int i = 0; i < cv_imgs.size(); ++i) {
+    CHECK_EQ(channels, cv_imgs[i].channels());
+    CHECK_EQ(datum_height, cv_imgs[i].rows);
+    CHECK_EQ(datum_width, cv_imgs[i].cols);
+    for (int h = 0; h < datum_height; ++h) {
+      const float *ptr = cv_imgs[i].ptr<float>(h);
+      int img_index = 0;
+      for (int w = 0; w < datum_width; ++w) {
+        for (int c = 0; c < cv_imgs[i].channels(); ++c) {
+          //int datum_index = ((i * channels + c) * datum_height + h) * datum_width + w;
+          buffer->Add(ptr[img_index++]);
+        }
+      }
+    }
+  }
+}
 
 }  // namespace caffe

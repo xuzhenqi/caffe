@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 #include <boost/random.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "caffe/data_layers.hpp"
 #include "caffe/layer.hpp"
@@ -62,6 +63,7 @@ namespace caffe {
             lines_.push_back(std::make_pair(filename, label));
             frames_.push_back(frame - 1); // For optical flow, ignore the last frame.
         }
+        infile.close();
 
         if (this->layer_param_.image_data_param().shuffle()) {
             LOG(FATAL) << "Shuffle is not supported";
@@ -106,6 +108,30 @@ namespace caffe {
         caffe::rng_t* prefetch_rng =
                 static_cast<caffe::rng_t*>(prefetch_rng_->generator());
         unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size() - 1));
+        // Inistialize min max
+        const string& min_max_file = this->layer_param_.image_data_rnn_param().min_max();
+        infile.open(min_max_file.c_str());
+        float min, max;
+        while(infile >> filename >> min >> max) {
+            min_max[filename] = make_pair(min, max);
+        }
+        LOG(INFO) << "min_max size: " << min_max.size();
+    }
+
+    template <typename Dtype>
+    void ImageDataOptLayer<Dtype>::GetMinMax(const string& filename, float& min, float& max) {
+        vector<string> words;
+        boost::split(words, filename, boost::is_any_of("/"));
+        /*
+        for(int i = 0; i < words.size(); ++i)
+            std::cout << words[i] << "\t";
+        std::cout << std::endl;
+         */
+        string file = words[words.size() - 1];
+        CHECK(min_max.count(file));
+        pair<float, float> p = min_max[file];
+        min = p.first;
+        max = p.second;
     }
 
     template <typename Dtype>
@@ -123,7 +149,6 @@ namespace caffe {
         const int new_width = image_data_param.new_width();
         const bool is_color = image_data_param.is_color();
         string root_folder = image_data_param.root_folder();
-        string filename1, filename2;
 
         caffe::rng_t* prefetch_rng =
                 static_cast<caffe::rng_t*>(prefetch_rng_->generator());
@@ -132,6 +157,9 @@ namespace caffe {
         int line_id_temp, offset;
         Datum datum;
         vector<string> filenames(2, "");
+        cv::Mat x, y, x1, y1;
+        vector<cv::Mat> mats(2);
+        float min, max;
         for (int i = 0; i < batch_size; ++i) {
             line_id_temp = (*unifor_gen)(*prefetch_rng);
             // get a blob
@@ -141,7 +169,15 @@ namespace caffe {
             filenames[1] = root_folder + lines_[line_id_temp].first + "_" +
                         boost::lexical_cast<string>(current_frame_[line_id_temp]) + "_y.png";
 
-            ReadImagesToDatum(filenames, &datum, new_height, new_width, is_color);
+            x = ReadImageToCVMat(filenames[0], new_height, new_width, is_color);
+            GetMinMax(filenames[0], min, max);
+            x.convertTo(x1, CV_32F, (max - min) / 255., min);
+            y = ReadImageToCVMat(filenames[1], new_height, new_width, is_color);
+            GetMinMax(filenames[1], min, max);
+            y.convertTo(y1, CV_32F, (max - min) / 255., min);
+            mats[0] = x1;
+            mats[1] = y1;
+            CVMatsToDatum(mats, &datum);
             // Apply transformations (mirror, crop...) to the image
             offset = this->prefetch_data_[0]->offset(i);
             this->transformed_data_.set_cpu_data(

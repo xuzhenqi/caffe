@@ -349,6 +349,7 @@ public:
 
 protected:
     virtual void InternalThreadEntry();
+    void GetMinMax(const string& filename, float& min, float& max);
     shared_ptr<Caffe::RNG> prefetch_rng_;
     shared_ptr<boost::uniform_int<int> > unifor_gen;
 
@@ -357,6 +358,7 @@ protected:
     vector<int> current_frame_;
     vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
     Blob<Dtype> transformed_data_;
+    map<string, pair<float, float> > min_max;
     int lines_id_;
     int fps_;
 };
