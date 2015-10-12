@@ -340,7 +340,8 @@ public:
 
     virtual inline const char* type() const { return "ImageDataOpt"; }
     virtual inline int ExactNumBottomBlobs() const { return 0; }
-    virtual inline int ExactNumTopBlobs() const { return 2; } // Data blobs and label blob
+    virtual inline int MinTopBlobs() const { return 2; }
+    virtual inline int MaxTopBlobs() const { return 3; }
 
     virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                              const vector<Blob<Dtype>*>& top);
@@ -358,9 +359,10 @@ protected:
     vector<int> current_frame_;
     vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
     Blob<Dtype> transformed_data_;
-    map<string, pair<float, float> > min_max;
+    map<string, pair<float, float> > min_max_;
     int lines_id_;
     int fps_;
+    bool rnn_;
 };
 
 template <typename Dtype>

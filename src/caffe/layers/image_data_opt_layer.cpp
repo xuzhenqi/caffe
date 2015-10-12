@@ -48,6 +48,12 @@ namespace caffe {
         const int new_width  = this->layer_param_.image_data_param().new_width();
         const bool is_color  = this->layer_param_.image_data_param().is_color();
         string root_folder = this->layer_param_.image_data_param().root_folder();
+        rnn_ = this->layer_param_.image_data_rnn_param().rnn();
+        if (rnn_) {
+            CHECK_EQ(3, top.size());
+        } else {
+            CHECK_EQ(2, top.size());
+        }
 
         CHECK((new_height == 0 && new_width == 0) ||
               (new_height > 0 && new_width > 0)) << "Current implementation requires "
@@ -100,6 +106,12 @@ namespace caffe {
         top[1]->Reshape(label_shape);
         this->prefetch_data_[1]->Reshape(label_shape);
 
+        if (rnn_) {
+            this->prefetch_data_.push_back(shared_ptr<Blob<Dtype> >(new Blob<Dtype>()));
+            this->prefetch_data_[2]->Reshape(top_shape);
+            top[2]->Reshape(top_shape);
+        }
+
         fps_ = this->layer_param_.image_data_rnn_param().fps();
         CHECK(current_frame_.empty());
         current_frame_.insert(current_frame_.begin(), lines_.size(), 1);
@@ -113,9 +125,9 @@ namespace caffe {
         infile.open(min_max_file.c_str());
         float min, max;
         while(infile >> filename >> min >> max) {
-            min_max[filename] = make_pair(min, max);
+            min_max_[filename] = make_pair(min, max);
         }
-        LOG(INFO) << "min_max size: " << min_max.size();
+        LOG(INFO) << "min_max size: " << min_max_.size();
     }
 
     template <typename Dtype>
@@ -128,8 +140,8 @@ namespace caffe {
         std::cout << std::endl;
          */
         string file = words[words.size() - 1];
-        CHECK(min_max.count(file));
-        pair<float, float> p = min_max[file];
+        CHECK(min_max_.count(file));
+        pair<float, float> p = min_max_[file];
         min = p.first;
         max = p.second;
     }
@@ -142,6 +154,8 @@ namespace caffe {
         CPUTimer timer;
         CHECK(this->prefetch_data_[0]->count());
         CHECK(this->prefetch_data_[1]->count());
+        if (rnn_)
+            CHECK(this->prefetch_data_[2]->count());
         CHECK(this->transformed_data_.count());
         ImageDataParameter image_data_param = this->layer_param_.image_data_param();
         const int batch_size = image_data_param.batch_size();
@@ -183,10 +197,31 @@ namespace caffe {
             this->transformed_data_.set_cpu_data(
                     prefetch_data_[0]->mutable_cpu_data() + offset);
             this->data_transformer_->Transform(datum, &(this->transformed_data_));
+            if (rnn_) {
+                filenames[0] = root_folder + lines_[line_id_temp].first + "_" +
+                               boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + "_x.png";
+                filenames[1] = root_folder + lines_[line_id_temp].first + "_" +
+                               boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + "_y.png";
+
+                x = ReadImageToCVMat(filenames[0], new_height, new_width, is_color);
+                GetMinMax(filenames[0], min, max);
+                x.convertTo(x1, CV_32F, (max - min) / 255., min);
+                y = ReadImageToCVMat(filenames[1], new_height, new_width, is_color);
+                GetMinMax(filenames[1], min, max);
+                y.convertTo(y1, CV_32F, (max - min) / 255., min);
+                mats[0] = x1;
+                mats[1] = y1;
+                CVMatsToDatum(mats, &datum);
+                // Apply transformations (mirror, crop...) to the image
+                offset = this->prefetch_data_[2]->offset(i);
+                this->transformed_data_.set_cpu_data(
+                        prefetch_data_[2]->mutable_cpu_data() + offset);
+                this->data_transformer_->Transform(datum, &(this->transformed_data_));
+            }
             // Reading label
             prefetch_label[i] = lines_[line_id_temp].second;
             current_frame_[line_id_temp] += fps_;
-            if (current_frame_[line_id_temp] > frames_[line_id_temp]) {
+            if (current_frame_[line_id_temp] > frames_[line_id_temp] - rnn_ * fps_) {
                 current_frame_[line_id_temp] = 1;
             }
             trans_time += timer.MicroSeconds();

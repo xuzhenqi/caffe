@@ -407,6 +407,9 @@ message ImageDataRNNParameter {
   optional uint32 fps = 1 [default = 5];
   // used for optical flow layer
   optional string min_max = 2;
+  // used for optical flow layer, if set true,
+  // the opt layer will output three top blobs
+  optional bool rnn = 3 [default = false];
 }
 
 // Message that stores parameters used by TripletImageDataLayer
