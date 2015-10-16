@@ -25,9 +25,21 @@ void InsertSplits(const NetParameter& param, NetParameter* param_split) {
     const string& blob_name = param.input(i);
     blob_name_to_last_top_idx[blob_name] = make_pair(-1, i);
   }
+  // Deal with copy blobs from other layer. Used in rnn Net.
   for (int i = 0; i < param.layer_size(); ++i) {
     const LayerParameter& layer_param = param.layer(i);
     layer_idx_to_layer_name[i] = layer_param.name();
+    for (int j = 0; j < layer_param.bottom_from_size(); ++j) {
+      const string& blob_name = layer_param.bottom(j);
+      if (blob_name_to_last_top_idx.find(blob_name) !=
+              blob_name_to_last_top_idx.end()) {
+        LOG(FATAL) << "Duplicated copy blobs " << blob_name << " to layer" << j;
+      }
+      blob_name_to_last_top_idx[blob_name] = make_pair(-1, j);
+    }
+  }
+  for (int i = 0; i < param.layer_size(); ++i) {
+    const LayerParameter& layer_param = param.layer(i);
     for (int j = 0; j < layer_param.bottom_size(); ++j) {
       const string& blob_name = layer_param.bottom(j);
       if (blob_name_to_last_top_idx.find(blob_name) ==

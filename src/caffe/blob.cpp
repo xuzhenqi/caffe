@@ -133,6 +133,15 @@ void Blob<Dtype>::ShareDiff(const Blob& other) {
   diff_ = other.diff();
 }
 
+template <typename Dtype>
+void Blob<Dtype>::swap(Blob &other) {
+  data_.swap(other.data_);
+  diff_.swap(other.diff_);
+  shape_.swap(other.shape_);
+  std::swap(count_, other.count_);
+  std::swap(capacity_, other.capacity_);
+}
+
 // The "update" method is used for parameter blobs in a Net, which are stored
 // as Blob<float> or Blob<double> -- hence we do not define it for
 // Blob<int> or Blob<unsigned int>.

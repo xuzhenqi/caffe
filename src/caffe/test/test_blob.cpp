@@ -52,6 +52,37 @@ TYPED_TEST(BlobSimpleTest, TestReshape) {
   EXPECT_EQ(this->blob_->count(), 120);
 }
 
+TYPED_TEST(BlobSimpleTest, TestSwap) {
+  typedef TypeParam Dtype;
+
+  Blob<Dtype> blob(3, 2, 1, 4);
+  for (int i = 0; i < 24; ++i) {
+    blob.mutable_cpu_data()[i] = i;
+  }
+  for (int i = 0; i < 120; ++i) {
+    this->blob_preshaped_->mutable_cpu_data()[i] = 2 * i;
+  }
+  this->blob_preshaped_->swap(blob);
+  EXPECT_EQ(this->blob_preshaped_->num(), 3);
+  EXPECT_EQ(this->blob_preshaped_->channels(), 2);
+  EXPECT_EQ(this->blob_preshaped_->height(), 1);
+  EXPECT_EQ(this->blob_preshaped_->width(), 4);
+  EXPECT_EQ(this->blob_preshaped_->count(), 24);
+
+  EXPECT_EQ(blob.num(), 2);
+  EXPECT_EQ(blob.channels(), 3);
+  EXPECT_EQ(blob.height(), 4);
+  EXPECT_EQ(blob.width(), 5);
+  EXPECT_EQ(blob.count(), 120);
+
+  for (int i = 0; i < 24; ++i) {
+    EXPECT_EQ(this->blob_preshaped_->cpu_data()[i], i);
+  }
+  for (int i = 0; i < 120; ++i) {
+    EXPECT_EQ(blob.cpu_data()[i], 2 * i);
+  }
+}
+
 TYPED_TEST(BlobSimpleTest, TestLegacyBlobProtoShapeEquals) {
   BlobProto blob_proto;
 

@@ -277,6 +277,12 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
       }
     }
   }
+
+  rnn_ = param.rnn();
+  if (rnn_) {
+    available_blobs.erase("begin_marker");
+  }
+
   // In the end, all remaining blobs are considered output blobs.
   for (set<string>::iterator it = available_blobs.begin();
       it != available_blobs.end(); ++it) {
@@ -468,6 +474,22 @@ int Net<Dtype>::AppendBottom(const NetParameter& param, const int layer_id,
     map<string, int>* blob_name_to_idx) {
   const LayerParameter& layer_param = param.layer(layer_id);
   const string& blob_name = layer_param.bottom(bottom_id);
+  if (layer_param.bottom_from_size() > bottom_id) {
+    shared_ptr<Blob<Dtype> > blob_pointer(new Blob<Dtype>());
+    const int blob_id = blobs_.size();
+    blobs_.push_back(blob_pointer);
+    blob_names_.push_back(blob_name);
+    blob_need_backward_.push_back(false);
+    if (blob_name_to_idx) {
+      (*blob_name_to_idx)[blob_name] = blob_id;
+    }
+    string bottom_from = layer_param.bottom_from(bottom_id);
+    bottom_from_other_[blob_name] = bottom_from;
+    blob_pointer->Reshape(layer_param.bottom_shape(bottom_id));
+    if (available_blobs) {
+      available_blobs->insert(blob_name);
+    }
+  }
   if (available_blobs->find(blob_name) == available_blobs->end()) {
     LOG(FATAL) << "Unknown blob input " << blob_name
                << " (at index " << bottom_id << ") to layer " << layer_id;
@@ -570,6 +592,46 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
       } else {
         has_params_decay_[learnable_param_id] = true;
         params_weight_decay_[learnable_param_id] = param_spec->decay_mult();
+      }
+    }
+  }
+}
+
+template<typename Dtype>
+void Net<Dtype>::CopyBottoms() {
+  map<string, string>::iterator it;
+  int dst, src;
+  const shared_ptr<Blob<Dtype> > begin = blob_by_name("begin_marker");
+  Dtype *marker = begin->mutable_cpu_data(), *data;
+  int index;
+  for(it = bottom_from_other_.begin(); it != bottom_from_other_.end(); ++it) {
+    dst = blob_names_index_[it->first];
+    src = blob_names_index_[it->second];
+    blobs_[dst]->swap(*(blobs_[src].get()));
+    CHECK_EQ(begin->count(), blobs_[dst]->shape(0));
+    if (Caffe::mode() == Caffe::GPU) {
+#ifndef CPU_ONLY
+        // NOLINT_NEXT_LINE(caffe/alt_fn)
+        data = blobs_[dst]->mutable_gpu_data();
+#else
+        NO_GPU;
+#endif
+    } else {
+        data = blobs_[dst]->mutable_cpu_data();
+    }
+    index = blobs_[dst]->count(1);
+    for (int i = 0; i < begin->count(); ++i) {
+      if (marker[i] > 0.5) {
+          if (Caffe::mode() == Caffe::GPU) {
+#ifndef CPU_ONLY
+              // NOLINT_NEXT_LINE(caffe/alt_fn)
+              caffe_gpu_set(index, Dtype(0), data + i*index);
+#else
+              NO_GPU;
+#endif
+          } else {
+              caffe_set(index, Dtype(0), data + i*index);
+          }
       }
     }
   }

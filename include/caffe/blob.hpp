@@ -263,6 +263,8 @@ class Blob {
    */
   void ShareDiff(const Blob& other);
 
+  void swap(Blob& other);
+
   bool ShapeEquals(const BlobProto& other);
 
  protected:

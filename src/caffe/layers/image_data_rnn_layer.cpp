@@ -68,7 +68,6 @@ void ImageDataRNNLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom
     LOG(FATAL) << "Shuffle is not supported";
   }
   LOG(INFO) << "A total of " << lines_.size() << " videos.";
-  std::cout << "A total of " << lines_.size() << " videos." << std::endl;
 
   lines_id_ = 0;
   // Check if we would need to randomly skip a few data points
@@ -108,7 +107,7 @@ void ImageDataRNNLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom
   prefetch_rng_.reset(new Caffe::RNG(prefetch_rng_seed));
   caffe::rng_t* prefetch_rng =
       static_cast<caffe::rng_t*>(prefetch_rng_->generator());
-  unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size()));
+  unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size() - 1));
   //boost::variate_generator<caffe::rng_t*, boost::uniform_int<int> >
   //    variate_generator(caffe_rng(), *unifor_gen);
   current_line_id_.reserve(batch_size);
@@ -136,7 +135,6 @@ void ImageDataRNNLayer<Dtype>::InternalThreadEntry() {
   const int batch_size = image_data_param.batch_size();
   const int new_height = image_data_param.new_height();
   const int new_width = image_data_param.new_width();
-  const int crop_size = this->layer_param_.transform_param().crop_size();
   const bool is_color = image_data_param.is_color();
   string root_folder = image_data_param.root_folder();
   string filename;
@@ -144,7 +142,7 @@ void ImageDataRNNLayer<Dtype>::InternalThreadEntry() {
   caffe::rng_t* prefetch_rng =
       static_cast<caffe::rng_t*>(prefetch_rng_->generator());
   Dtype* prefetch_label = this->prefetch_data_[1]->mutable_cpu_data();
-  Dtype* prefetch_end_mark = this->prefetch_data_[2]->mutable_cpu_data();
+  Dtype* prefetch_begin_mark = this->prefetch_data_[2]->mutable_cpu_data();
 
   for (int i = 0; i < batch_size; ++i) {
     // get a blob
@@ -162,13 +160,12 @@ void ImageDataRNNLayer<Dtype>::InternalThreadEntry() {
         prefetch_data_[0]->mutable_cpu_data() + offset);
     this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
     prefetch_label[i] = lines_[current_line_id_[i]].second;
+
+    prefetch_begin_mark[i] = (current_frame_[i] == 1);
     current_frame_[i] += fps_;
     if (current_frame_[i] > frames_[current_line_id_[i]]) {
-      prefetch_end_mark[i] = 1;
       current_line_id_[i] = (*unifor_gen)(*prefetch_rng);
       current_frame_[i] = 1;
-    } else {
-      prefetch_end_mark[i] = 0;
     }
 
     trans_time += timer.MicroSeconds();

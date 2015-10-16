@@ -1,7 +1,4 @@
 import sys
-CAFFE_ROOT = '/home/xuzhenqi/research/caffe/'
-NET_PROTO_HELPER_ROOT = CAFFE_ROOT + 'tools/extra/'
-sys.path.append(NET_PROTO_HELPER_ROOT)
 from net_proto_helper import *
 import argparse
 
@@ -481,6 +478,3 @@ if __name__ == '__main__':
                loss3_loss_1, loss3_loss_2, loss3_top1_1, loss3_top1_2,
                loss3_top5_1, loss3_top5_2]
     print display(layers)
-
-
-

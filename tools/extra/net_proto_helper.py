@@ -1,6 +1,5 @@
 import copy
 
-
 class Atom:
     def __init__(self, title, value):
         self.title = title
@@ -92,9 +91,9 @@ class BlobProto(Compound):
 class BlobShape(Compound):
     def __init__(self, *args):
         self.__titles__ = ['dim']
-        self.initial()
+        self.initial({})
         for i in args:
-            self.dim.append([Atom('dim', i)])
+            self.dim.append(Atom('dim', i))
 
 
 class NetStateRule(Compound):
@@ -251,8 +250,11 @@ class ImageDataRNNParameter(Compound):
 class LayerParameter(Compound):
     def __init__(self, type, **kwargs):
         self.__titles__ = ['name', 'type', 'bottom', 'top', 'phase',
-                           'loss_weight', 'param', 'blobs', 'include',
-                           'exclude', 'transform_param', 'loss_param',
+                           'loss_weight', 'param', 'blobs', 'propagate_down',
+                           'include',
+                           'exclude', 'bottom_from', 'bottom_shape',
+                           'transform_param',
+                           'loss_param',
                            'concat_param', 'convolution_param', 'data_param',
                            'eltwise_param', 'accuracy_param',
                            'dropout_param', 'image_data_param',
@@ -450,6 +452,54 @@ class ConvRNN(Block):
                                     top=self.top[1])
         self.__layers__ = [self.conv, self.relu1, self.conv_rnn, self.sum, self.relu2]
 
+class ConvRNN_v2(Block):
+    def __init__(self, name, bottom, top, conv_param, eltwise_param, param, rnn_shape):
+        self.name = name
+        self.bottom = bottom
+        self.top = top
+        self.conv_param = conv_param
+        self.eltwise_param = eltwise_param
+        self.param = param
+        self.rnn_shape = rnn_shape
+        self.change()
+
+    def change(self):
+        # check parameters
+        if not (isinstance(self.conv_param, list) and len(self.conv_param) == 2):
+            print "[Error]: ConvRNN block receive two conv_params."
+            exit(0)
+        if not isinstance(self.param[0], list):
+            self.param = [self.param, self.param]
+        # Conv layer
+        self.conv = LayerParameter('Convolution',
+                                   name=self.name + '/conv',
+                                   bottom=self.bottom,
+                                   top=self.name + '/conv',
+                                   convolution_param=self.conv_param[0],
+                                   param=self.param[0])
+        # ConvRNN
+        self.conv_rnn = LayerParameter('Convolution',
+                                       name=self.name + '/convrnn',
+                                       bottom=self.name + '_rnn',
+                                       top=self.name + '/convrnn',
+                                       convolution_param=self.conv_param[1],
+                                       param=self.param[1],
+                                       bottom_from=self.top,
+                                       bottom_shape=self.rnn_shape,
+                                       propagate_down=Enum('false'))
+
+        # Eltwise SUM
+        self.sum = LayerParameter('Eltwise',
+                                  name=self.name + '/sum',
+                                  bottom=[self.name + '/conv', self.name + '/convrnn'],
+                                  top=self.top,
+                                  eltwise_param=self.eltwise_param)
+        # relu
+        self.relu = LayerParameter('ReLU',
+                                    name=self.name + '/relu',
+                                    bottom=self.top,
+                                    top=self.top)
+        self.__layers__ = [self.conv, self.conv_rnn, self.sum, self.relu]
 
 class IPRNN(Block):
     def __init__(self, name, bottom, top, ip_param, eltwise_param, param):
@@ -506,6 +556,54 @@ class IPRNN(Block):
                                     top=self.top[1])
         self.__layers__ = [self.ip, self.relu1, self.ip_rnn, self.sum, self.relu2]
 
+class IPRNN_v2(Block):
+    def __init__(self, name, bottom, top, ip_param, eltwise_param, param,
+                 rnn_shape):
+        self.name = name
+        self.bottom = bottom
+        self.top = top
+        self.ip_param = ip_param
+        self.eltwise_param = eltwise_param
+        self.param = param
+        self.rnn_shape = rnn_shape
+        self.change()
+
+    def change(self):
+        # check parameters
+        if not (isinstance(self.ip_param, list) and len(self.ip_param) == 2):
+            print "[Error]: IPRNN block receive two ip_params."
+            exit(0)
+        if not isinstance(self.param[0], list):
+            self.param = [self.param, self.param]
+        # IP layer
+        self.ip = LayerParameter('InnerProduct',
+                                 name=self.name + '/ip',
+                                 bottom=self.bottom,
+                                 top=self.name + '/ip',
+                                 inner_product_param=self.ip_param[0],
+                                 param=self.param[0])
+        # IPRNN
+        self.ip_rnn = LayerParameter('InnerProduct',
+                                     name=self.name + '/iprnn',
+                                     bottom=self.name + '_rnn',
+                                     top=self.name + '/iprnn',
+                                     inner_product_param=self.ip_param[1],
+                                     param=self.param[1],
+                                     bottom_from=self.top,
+                                     bottom_shape=self.rnn_shape,
+                                     propagate_down=Enum('false'))
+        # Eltwise SUM
+        self.sum = LayerParameter('Eltwise',
+                                  name=self.name + '/sum',
+                                  bottom=[self.name + '/ip', self.name + '/iprnn'],
+                                  top=self.top,
+                                  eltwise_param=self.eltwise_param)
+        # relu
+        self.relu = LayerParameter('ReLU',
+                                    name=self.name + '/relu',
+                                    bottom=self.top,
+                                    top=self.top)
+        self.__layers__ = [self.ip, self.ip_rnn, self.sum, self.relu]
 
 class Inception(Block):
     def __init__(self, name='', bottom='', top='', param=[]):
@@ -780,6 +878,152 @@ class InceptionRNN(Block):
                 print "[Error] pool proj does not exist"
                 exit(0)
 
+class InceptionRNN_v2(Block):
+    def __init__(self, name, bottom, top, inception_param, eltwise_param,
+                 param, rnn_shapes):
+        self.name = name
+        self.bottom = bottom
+        self.top = top
+        self.inception_param = inception_param
+        self.eltwise_param = eltwise_param
+        self.param = param
+        self.rnn_shapes = rnn_shapes
+        self.__layers__ = []
+        self.change()
+
+    def change(self):
+        # check param
+        if not (isinstance(self.inception_param, list)
+                and len(self.inception_param) == 7):
+            print "[Error]: InceptionRNN block receive seven inception_params."
+            exit(0)
+        if not isinstance(self.param[0], list):
+            self.param = [self.param, self.param]
+        self.__layers__ = []
+
+        self.concat_bottom = []
+        if self.inception_param[0]:
+            self.c1x1_rnn = ConvRNN_v2(self.name+'/c1x1_rnn', self.bottom,
+                                    self.name+'/c1x1_rnn',
+                                    [self.inception_param[0], self.inception_param[0]],
+                                    self.eltwise_param, self.param,
+                                    self.rnn_shapes[0])
+            self.__layers__ += self.c1x1_rnn.__layers__
+            self.concat_bottom.append(self.name + '/c1x1_rnn')
+        else:
+            print "Info: 1x1 conv not set"
+        bool_temp = bool(self.inception_param[1]) + bool(self.inception_param[2])
+        if bool_temp == 1:
+            print "Error: c3x3_r_param and c3x3_param \
+                    should be set both or not set both"
+            exit(0)
+        elif bool_temp == 0:
+            print "Info: 3x3 conv not set"
+        else:
+            self.c3x3_rnn_r = ConvRNN_v2(self.name + '/c3x3_rnn_r', self.bottom,
+                                      self.name + '/c3x3_rnn_r',
+                                      [self.inception_param[1], self.inception_param[1]],
+                                      self.eltwise_param, self.param,
+                                      self.rnn_shapes[1])
+            self.__layers__ += self.c3x3_rnn_r.__layers__
+            self.c3x3_rnn = ConvRNN_v2(self.name + '/c3x3_rnn',
+                                    self.name + '/c3x3_rnn_r',
+                                    self.name + '/c3x3_rnn',
+                                    [self.inception_param[2], self.inception_param[2]],
+                                    self.eltwise_param, self.param,
+                                    self.rnn_shapes[2])
+            self.__layers__ += self.c3x3_rnn.__layers__
+            self.concat_bottom.append(self.name + '/c3x3_rnn')
+        bool_temp = bool(self.inception_param[3]) + bool(self.inception_param[4])
+        if bool_temp == 1:
+            print "Error: c5x5_r_param and c5x5_param \
+                    should be set both or not set both"
+            exit(0)
+        elif bool_temp == 0:
+            print "Info: 5x5 conv not set"
+        else:
+            self.c5x5_rnn_r = ConvRNN_v2(self.name + '/c5x5_rnn_r', self.bottom,
+                                      self.name + '/c5x5_rnn_r',
+                                      [self.inception_param[3], self.inception_param[3]],
+                                      self.eltwise_param, self.param,
+                                      self.rnn_shapes[3])
+            self.__layers__ += self.c5x5_rnn_r.__layers__
+            self.c5x5_rnn = ConvRNN_v2(self.name + '/c5x5_rnn',
+                                    self.name + '/c5x5_rnn_r',
+                                    self.name + '/c5x5_rnn',
+                                    [self.inception_param[4], self.inception_param[4]],
+                                    self.eltwise_param, self.param,
+                                    self.rnn_shapes[4])
+            self.__layers__ += self.c5x5_rnn.__layers__
+            self.concat_bottom.append(self.name + '/c5x5_rnn')
+        if self.inception_param[5]:
+            self.pool = LayerParameter('Pooling',
+                                       name=self.name + '/pool',
+                                       bottom=self.bottom,
+                                       top=self.name + '/pool',
+                                       pooling_param=self.inception_param[5])
+            self.__layers__.append(self.pool)
+            self.concat_bottom.append(self.name + '/pool')
+            if self.inception_param[6]:
+                self.pool_pro_rnn = ConvRNN_v2(self.name + '/pool_pro_rnn',
+                                            self.name + '/pool',
+                                            self.name + '/pool_pro',
+                                            [self.inception_param[6], self.inception_param[6]],
+                                            self.eltwise_param, self.param,
+                                            self.rnn_shapes[6])
+                self.__layers__ += self.pool_pro_rnn.__layers__
+                self.concat_bottom[-1] = self.name + '/pool_pro'
+        elif self.inception_param[6]:
+            print "pool_pro exists only if pool exists!"
+            exit(0)
+        if len(self.concat_bottom) <= 1:
+            print "Error: concat_bottom should be more than 1"
+            exit(0)
+        self.concat = LayerParameter('Concat',
+                                     name=self.name + 'concat_1', bottom=self.concat_bottom,
+                                     top=self.top)
+        self.__layers__.append(self.concat)
+
+    def set_depth_names(self, n1x1, n3x3_r, n3x3, n5x5_r, n5x5, npool_pro):
+        if n1x1:
+            if self.inception_param[0]:
+                self.c1x1_rnn.conv.set('name', n1x1)
+            else:
+                print "[Error] 1x1 does not exist"
+                exit(0)
+        if n3x3_r:
+            if self.inception_param[1]:
+                self.c3x3_rnn_r.conv.set('name', n3x3_r)
+            else:
+                print "[Error] 3x3 reduce does not exist"
+                exit(0)
+        if n3x3:
+            if self.inception_param[2]:
+                self.c3x3_rnn.conv.set('name', n3x3)
+            else:
+                print "[Error] 3x3 does not exist"
+                exit(0)
+        if n5x5_r:
+            if self.inception_param[3]:
+                self.c5x5_rnn_r.conv.set('name', n5x5_r)
+            else:
+                print "[Error] 5x5 reduce does not exist"
+                exit(0)
+        if n5x5:
+            if self.inception_param[4]:
+                self.c5x5_rnn.conv.set('name', n5x5)
+        if npool_pro:
+            if self.inception_param[6]:
+                self.pool_pro_rnn.conv.set('name', npool_pro)
+            else:
+                print "[Error] pool proj does not exist"
+
+    @staticmethod
+    def get_rnn_shapes(height, width, channels, num_output):
+        ans = []
+        for c in channels:
+            ans.append(BlobShape(num_output, c, height, width))
+        return ans
 
 def copy_layers(layers=[], suffix1='', suffix2='_2', share_param=False):
     if layers == []:
@@ -846,4 +1090,16 @@ def get_ipp(num_output, weight_filler=filler_xavier,
                                  weight_filler=weight_filler,
                                  bias_filler=bias_filler)
 
-
+if __name__ == '__main__':
+    elt_param = EltwiseParameter(Enum('SUM'), coeff=[0.5, 0.5])
+    param = [param_1_1, param_2_0]
+    rnn_shape = BlobShape(96, 96, 56, 56)
+    rnn_shape2 = BlobShape(96, 96, 1, 1)
+    conv_rnn = ConvRNN_v2('conv_rnn', 'data1', 'conv_rnn',
+                          [get_cp(96, 1, 3, 1), get_cp(96, 1, 3, 1)],
+                          elt_param, param, rnn_shape)
+    print display(conv_rnn.__layers__)
+    ip_rnn = IPRNN_v2('ip_rnn', 'data1', 'ip_rnn',
+                          [get_ipp(96), get_ipp(96)],
+                          elt_param, param, rnn_shape2)
+    print display(ip_rnn.__layers__)

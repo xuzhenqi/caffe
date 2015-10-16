@@ -84,6 +84,9 @@ class Net {
 
   Dtype ForwardBackward(const vector<Blob<Dtype>* > & bottom) {
     Dtype loss;
+    if (rnn_) {
+      CopyBottoms();
+    }
     Forward(bottom, &loss);
     Backward();
     return loss;
@@ -118,6 +121,9 @@ class Net {
   void ToProto(NetParameter* param, bool write_diff = false) const;
   /// @brief Writes the net to an HDF5 file.
   void ToHDF5(const string& filename, bool write_diff = false) const;
+
+  // Used in rnn Net
+  void CopyBottoms();
 
   /// @brief returns the network name.
   inline const string& name() const { return name_; }
@@ -193,6 +199,9 @@ class Net {
   }
   inline const vector<int>& output_blob_indices() const {
     return net_output_blob_indices_;
+  }
+  inline const map<string, string>& bottom_from_other() const {
+      return bottom_from_other_;
   }
   bool has_blob(const string& blob_name) const;
   const shared_ptr<Blob<Dtype> > blob_by_name(const string& blob_name) const;
@@ -271,6 +280,7 @@ class Net {
   vector<int> net_output_blob_indices_;
   vector<Blob<Dtype>*> net_input_blobs_;
   vector<Blob<Dtype>*> net_output_blobs_;
+  map<string, string> bottom_from_other_;
   /// The parameters in the network.
   vector<shared_ptr<Blob<Dtype> > > params_;
   vector<Blob<Dtype>*> learnable_params_;
@@ -294,6 +304,7 @@ class Net {
   bool debug_info_;
   /// The root net that actually holds the shared layers in data parallelism
   const Net* const root_net_;
+  bool rnn_;
   DISABLE_COPY_AND_ASSIGN(Net);
 };
 

@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <caffe/util/im2col.hpp>
 
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"

@@ -1,4 +1,5 @@
 #include <string>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -713,11 +714,103 @@ class NetTest : public MultiDeviceTest<TypeParam> {
     InitNetFromProtoString(proto);
   }
 
+  virtual void InitRnnNet() {
+      string proto;
+      proto = "name: 'RnnNetwork' "
+              "layer { "
+              "  name: 'data' "
+              "  type: 'DummyData' "
+              "  dummy_data_param { "
+              "    num: 10 "
+              "    channels: 10 "
+              "    height: 1 "
+              "    width: 1 "
+              "    num: 10 "
+              "    channels: 1 "
+              "    height: 1 "
+              "    width: 1 "
+              "    data_filler { "
+              "      type: 'gaussian' "
+              "      std: 0.5 "
+              "    } "
+              "  } "
+              "  top: 'data1' "
+              "  top: 'begin_marker' "
+              "} "
+              "layer { "
+              "  name: 'innerproduct1' "
+              "  type: 'InnerProduct' "
+              "  inner_product_param { "
+              "    num_output: 10 "
+              "    bias_term: false "
+              "    weight_filler { "
+              "      type: 'constant' "
+              "      value: 0.5 "
+              "    } "
+              "  } "
+              "  bottom: 'data1' "
+              "  top: 'innerproduct1' "
+              "} "
+              "layer { "
+              "  name: 'innerproduct2' "
+              "  type: 'InnerProduct' "
+              "  inner_product_param { "
+              "    num_output: 10 "
+              "    bias_term: false "
+              "    weight_filler { "
+              "      type: 'constant' "
+              "      value: 0.5 "
+              "    } "
+              "  } "
+              "  bottom: 'data2' "
+              "  top: 'innerproduct2' "
+              "  bottom_from: 'innerproduct1' "
+              "  propagate_down: false"
+              "  bottom_shape {"
+              "     dim: 10"
+              "     dim: 10"
+              "     dim: 1"
+              "     dim: 1"
+              "  }"
+              "} "
+              "layer { "
+              "  name: 'loss' "
+              "  type: 'EuclideanLoss' "
+              "  bottom: 'data1' "
+              "  bottom: 'innerproduct2' "
+              "} ";
+      InitNetFromProtoString(proto);
+  }
   int seed_;
   shared_ptr<Net<Dtype> > net_;
 };
 
 TYPED_TEST_CASE(NetTest, TestDtypesAndDevices);
+
+TYPED_TEST(NetTest, TestRnnNet) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->InitRnnNet();
+  const map<string, string> &bottom_from_other = this->net_->bottom_from_other();
+  this->net_->ForwardBackward(vector<Blob<Dtype> *>());
+  shared_ptr<Blob<Dtype> > p_i1= this->net_->blob_by_name("innerproduct1");
+  Blob<Dtype> temp(p_i1->shape());
+  temp.CopyFrom(*p_i1);
+  this->net_->CopyBottoms();
+  const shared_ptr<Blob<Dtype> > p_data2 = this->net_->blob_by_name("data2");
+  const shared_ptr<Blob<Dtype> > p_begin = this->net_->blob_by_name("begin_marker");
+  int index = p_data2->count(1);
+  const Dtype *temp_data = temp.cpu_data();
+  const Dtype *data2 = p_data2->cpu_data();
+  for(int i = 0; i < p_begin->count(); ++i) {
+      for (int j = 0; j < p_data2->count(1); ++j) {
+          if (p_begin->cpu_data()[i] > 0.5) {
+              CHECK_EQ(0, data2[i*index+j]);
+          } else {
+              CHECK_EQ(temp_data[i*index+j], data2[i*index+j]);
+          }
+      }
+  }
+}
 
 TYPED_TEST(NetTest, TestHasBlob) {
   this->InitTinyNet();

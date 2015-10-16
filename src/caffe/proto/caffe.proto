@@ -87,6 +87,8 @@ message NetParameter {
   // Net::Backward, and Net::Update.
   optional bool debug_info = 7 [default = false];
 
+  optional bool rnn = 9 [default = false];
+
   // The layers that make up the net.  Each of their configurations, including
   // connectivity and behavior, is specified as a LayerParameter.
   repeated LayerParameter layer = 100;  // ID 100 so layers are printed last.
@@ -340,6 +342,11 @@ message LayerParameter {
   // included/excluded.
   repeated NetStateRule include = 8;
   repeated NetStateRule exclude = 9;
+
+  // indicated where the blob come from, if not set, then the blob is generated.
+  // else copy from other blob;
+  repeated string bottom_from = 12;
+  repeated BlobShape bottom_shape = 13;
 
   // Parameters for data pre-processing.
   optional TransformationParameter transform_param = 100;
