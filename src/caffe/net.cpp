@@ -281,6 +281,7 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   rnn_ = param.rnn();
   if (rnn_) {
     available_blobs.erase("begin_marker");
+    copy_bottoms_times_ = 0;
   }
 
   // In the end, all remaining blobs are considered output blobs.
@@ -635,12 +636,16 @@ void Net<Dtype>::CopyBottoms() {
       }
     }
   }
+  ++copy_bottoms_times_;
 }
 
 template <typename Dtype>
 Dtype Net<Dtype>::ForwardFromTo(int start, int end) {
   CHECK_GE(start, 0);
   CHECK_LT(end, layers_.size());
+  if (rnn_){
+    CopyBottoms();
+  }
   Dtype loss = 0;
   if (debug_info_) {
     for (int i = 0; i < net_input_blobs_.size(); ++i) {
@@ -902,9 +907,11 @@ void Net<Dtype>::CopyTrainedLayersFrom(const NetParameter& param) {
     DLOG(INFO) << "Copying source layer " << source_layer_name;
     vector<shared_ptr<Blob<Dtype> > >& target_blobs =
         layers_[target_layer_id]->blobs();
-    CHECK_EQ(target_blobs.size(), source_layer.blobs_size())
-        << "Incompatible number of blobs for layer " << source_layer_name;
-    for (int j = 0; j < target_blobs.size(); ++j) {
+    //CHECK_EQ(target_blobs.size(), source_layer.blobs_size())
+    //    << "Incompatible number of blobs for layer " << source_layer_name;
+    int copy_blob_size = std::min(int(target_blobs.size()),
+                                  source_layer.blobs_size());
+    for (int j = 0; j < copy_blob_size; ++j) {
       const bool kReshape = false;
       target_blobs[j]->FromProto(source_layer.blobs(j), kReshape);
     }

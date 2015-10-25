@@ -43,7 +43,8 @@ class GradientChecker {
   // computation only (e.g., neuron layers) -- where (d y_i) / (d x_j) = 0 when
   // i != j.
   void CheckGradientEltwise(Layer<Dtype>* layer,
-      const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top);
+      const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
+                            const int check_bottom = -1);
 
   void CheckGradientSingle(Layer<Dtype>* layer,
       const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
@@ -76,8 +77,13 @@ void GradientChecker<Dtype>::CheckGradientSingle(Layer<Dtype>* layer,
     CHECK_LE(0, top_id);
     CHECK_LE(0, top_data_id);
     const int top_count = top[top_id]->count();
-    for (int blob_id = 0; blob_id < bottom.size(); ++blob_id) {
-      CHECK_EQ(top_count, bottom[blob_id]->count());
+    if (check_bottom < 0) {
+      for (int blob_id = 0; blob_id < bottom.size(); ++blob_id) {
+        CHECK_EQ(top_count, bottom[blob_id]->count());
+      }
+    } else {
+      CHECK_LT(check_bottom, bottom.size());
+      CHECK_EQ(top_count, bottom[check_bottom]->count());
     }
   }
   // First, figure out what blobs we need to check against, and zero init
@@ -92,6 +98,7 @@ void GradientChecker<Dtype>::CheckGradientSingle(Layer<Dtype>* layer,
   if (check_bottom < 0) {
     for (int i = 0; i < bottom.size(); ++i) {
       blobs_to_check.push_back(bottom[i]);
+      propagate_down[check_bottom] = true;
     }
   } else {
     CHECK_LT(check_bottom, bottom.size());
@@ -198,10 +205,10 @@ void GradientChecker<Dtype>::CheckGradientExhaustive(Layer<Dtype>* layer,
 
 template <typename Dtype>
 void GradientChecker<Dtype>::CheckGradientEltwise(Layer<Dtype>* layer,
-    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
+                                                  const int check_bottom) {
   layer->SetUp(bottom, top);
   CHECK_GT(top.size(), 0) << "Eltwise mode requires at least one top blob.";
-  const int check_bottom = -1;
   const bool element_wise = true;
   for (int i = 0; i < top.size(); ++i) {
     for (int j = 0; j < top[i]->count(); ++j) {

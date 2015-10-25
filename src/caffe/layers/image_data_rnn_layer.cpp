@@ -64,9 +64,6 @@ void ImageDataRNNLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom
     frames_.push_back(frame);
   }
 
-  if (this->layer_param_.image_data_param().shuffle()) {
-    LOG(FATAL) << "Shuffle is not supported";
-  }
   LOG(INFO) << "A total of " << lines_.size() << " videos.";
 
   lines_id_ = 0;
@@ -112,12 +109,17 @@ void ImageDataRNNLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom
   //    variate_generator(caffe_rng(), *unifor_gen);
   current_line_id_.reserve(batch_size);
   for(int i = 0; i < batch_size; ++i) {
-    current_line_id_.push_back((*unifor_gen)(*prefetch_rng));
+    if (this->layer_param_.image_data_param().shuffle()) {
+      current_line_id_.push_back((*unifor_gen)(*prefetch_rng));
+    } else {
+      current_line_id_.push_back(i);
+    }
     //current_line_id_.push_back(caffe_rng_rand() % lines_.size());
     //current_line_id_.push_back(variate_generator());
     std::cout << current_line_id_[i] << " ";
   }
   std::cout << std::endl;
+  lines_id_ = batch_size;
 }
 
 template <typename Dtype>
@@ -164,7 +166,13 @@ void ImageDataRNNLayer<Dtype>::InternalThreadEntry() {
     prefetch_begin_mark[i] = (current_frame_[i] == 1);
     current_frame_[i] += fps_;
     if (current_frame_[i] > frames_[current_line_id_[i]]) {
-      current_line_id_[i] = (*unifor_gen)(*prefetch_rng);
+      if (this->layer_param().image_data_param().shuffle())
+        current_line_id_[i] = (*unifor_gen)(*prefetch_rng);
+      else {
+        current_line_id_[i] = lines_id_++;
+        if (lines_id_ >= lines_.size())
+          lines_id_ = 0;
+      }
       current_frame_[i] = 1;
     }
 

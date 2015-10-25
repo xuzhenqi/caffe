@@ -84,9 +84,6 @@ class Net {
 
   Dtype ForwardBackward(const vector<Blob<Dtype>* > & bottom) {
     Dtype loss;
-    if (rnn_) {
-      CopyBottoms();
-    }
     Forward(bottom, &loss);
     Backward();
     return loss;
@@ -306,6 +303,8 @@ class Net {
   const Net* const root_net_;
   bool rnn_;
   DISABLE_COPY_AND_ASSIGN(Net);
+ public:
+  int copy_bottoms_times_; // used for debug copy bottom functionality
 };
 
 

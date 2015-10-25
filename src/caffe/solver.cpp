@@ -206,7 +206,6 @@ void Solver<Dtype>::Step(int iters) {
     // accumulate the loss and gradient
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
-      net_->CopyBottoms();
       loss += net_->ForwardBackward(bottom_vec);
     }
     loss /= param_.iter_size();
@@ -242,6 +241,7 @@ void Solver<Dtype>::Step(int iters) {
               << result_vec[k] << loss_msg_stream.str();
         }
       }
+      LOG(INFO) << "Copy bottoms times: " << net_->copy_bottoms_times_;
     }
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_gradients_ready();
@@ -291,6 +291,7 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     Dtype loss;
     net_->ForwardPrefilled(&loss);
     LOG(INFO) << "Iteration " << iter_ << ", loss = " << loss;
+    LOG(INFO) << "Copy bottoms times: " << net_->copy_bottoms_times_;
   }
   if (param_.test_interval() && iter_ % param_.test_interval() == 0) {
     TestAll();

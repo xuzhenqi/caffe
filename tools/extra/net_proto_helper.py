@@ -1,4 +1,5 @@
 import copy
+import traceback
 
 class Atom:
     def __init__(self, title, value):
@@ -240,6 +241,12 @@ class EltwiseParameter(Compound):
         self.initial(kwargs)
         self.operation = [Atom('operation', operation)]
 
+class SumRNNParameter(Compound):
+    def __init__(self, *args):
+        self.__titles__ = ['coeff']
+        self.initial({})
+        for i in args:
+            self.coeff.append(Atom('coeff', i))
 
 class ImageDataRNNParameter(Compound):
     def __init__(self, fps):
@@ -256,7 +263,7 @@ class LayerParameter(Compound):
                            'transform_param',
                            'loss_param',
                            'concat_param', 'convolution_param', 'data_param',
-                           'eltwise_param', 'accuracy_param',
+                           'eltwise_param', 'sum_rnn_param', 'accuracy_param',
                            'dropout_param', 'image_data_param',
                            'image_data_rnn_param',
                            'inner_product_param', 'l2n_param', 'lrn_param',
@@ -453,12 +460,13 @@ class ConvRNN(Block):
         self.__layers__ = [self.conv, self.relu1, self.conv_rnn, self.sum, self.relu2]
 
 class ConvRNN_v2(Block):
-    def __init__(self, name, bottom, top, conv_param, eltwise_param, param, rnn_shape):
+    def __init__(self, name, bottom, top, conv_param, sum_rnn_param, param,
+                 rnn_shape):
         self.name = name
         self.bottom = bottom
         self.top = top
         self.conv_param = conv_param
-        self.eltwise_param = eltwise_param
+        self.sum_rnn_param = sum_rnn_param
         self.param = param
         self.rnn_shape = rnn_shape
         self.change()
@@ -466,10 +474,13 @@ class ConvRNN_v2(Block):
     def change(self):
         # check parameters
         if not (isinstance(self.conv_param, list) and len(self.conv_param) == 2):
-            print "[Error]: ConvRNN block receive two conv_params."
+            print "[Error]: ConvRNN_v2 block receive two conv_params."
             exit(0)
-        if not isinstance(self.param[0], list):
-            self.param = [self.param, self.param]
+        if not (isinstance(self.param[0], list) and len(self.param[0]) == 2
+                and not isinstance(self.param[1], list)):
+            print "[Error]: ConvRNN_v2 block receive two params, one has two" \
+                  " items and the other has one!"
+            exit(0)
         # Conv layer
         self.conv = LayerParameter('Convolution',
                                    name=self.name + '/conv',
@@ -489,11 +500,12 @@ class ConvRNN_v2(Block):
                                        propagate_down=Enum('false'))
 
         # Eltwise SUM
-        self.sum = LayerParameter('Eltwise',
-                                  name=self.name + '/sum',
-                                  bottom=[self.name + '/conv', self.name + '/convrnn'],
-                                  top=self.top,
-                                  eltwise_param=self.eltwise_param)
+        self.sum = LayerParameter('SumRNN',
+            name=self.name + '/sum',
+            bottom=[self.name + '/conv', self.name + '/convrnn',
+                    'begin_marker'],
+            top=self.top,
+            sum_rnn_param=self.sum_rnn_param)
         # relu
         self.relu = LayerParameter('ReLU',
                                     name=self.name + '/relu',
@@ -557,13 +569,13 @@ class IPRNN(Block):
         self.__layers__ = [self.ip, self.relu1, self.ip_rnn, self.sum, self.relu2]
 
 class IPRNN_v2(Block):
-    def __init__(self, name, bottom, top, ip_param, eltwise_param, param,
+    def __init__(self, name, bottom, top, ip_param, sum_rnn_param, param,
                  rnn_shape):
         self.name = name
         self.bottom = bottom
         self.top = top
         self.ip_param = ip_param
-        self.eltwise_param = eltwise_param
+        self.sum_rnn_param = sum_rnn_param
         self.param = param
         self.rnn_shape = rnn_shape
         self.change()
@@ -573,8 +585,11 @@ class IPRNN_v2(Block):
         if not (isinstance(self.ip_param, list) and len(self.ip_param) == 2):
             print "[Error]: IPRNN block receive two ip_params."
             exit(0)
-        if not isinstance(self.param[0], list):
-            self.param = [self.param, self.param]
+        if not (isinstance(self.param[0], list) and len(self.param[0]) == 2
+                and not isinstance(self.param[1], list)):
+            print "[Error]: ConvRNN_v2 block receive two params, one has two" \
+                  " items and the other has one!"
+            exit(0)
         # IP layer
         self.ip = LayerParameter('InnerProduct',
                                  name=self.name + '/ip',
@@ -591,13 +606,13 @@ class IPRNN_v2(Block):
                                      param=self.param[1],
                                      bottom_from=self.top,
                                      bottom_shape=self.rnn_shape,
-                                     propagate_down=Enum('false'))
+                                     propagate_down=False)
         # Eltwise SUM
-        self.sum = LayerParameter('Eltwise',
-                                  name=self.name + '/sum',
-                                  bottom=[self.name + '/ip', self.name + '/iprnn'],
-                                  top=self.top,
-                                  eltwise_param=self.eltwise_param)
+        self.sum = LayerParameter('SumRNN',
+               name=self.name + '/sum',
+               bottom=[self.name + '/ip', self.name + '/iprnn', 'begin_marker'],
+               top=self.top,
+               sum_rnn_param=self.sum_rnn_param)
         # relu
         self.relu = LayerParameter('ReLU',
                                     name=self.name + '/relu',
@@ -879,17 +894,23 @@ class InceptionRNN(Block):
                 exit(0)
 
 class InceptionRNN_v2(Block):
-    def __init__(self, name, bottom, top, inception_param, eltwise_param,
+    def __init__(self, name, bottom, top, inception_param, sum_rnn_param,
                  param, rnn_shapes):
         self.name = name
         self.bottom = bottom
         self.top = top
         self.inception_param = inception_param
-        self.eltwise_param = eltwise_param
+        self.sum_rnn_param = sum_rnn_param
         self.param = param
         self.rnn_shapes = rnn_shapes
         self.__layers__ = []
         self.change()
+
+    @staticmethod
+    def no_bias(cp):
+        ans = copy.deepcopy(cp)
+        ans.set('bias_term', False)
+        return ans
 
     def change(self):
         # check param
@@ -897,17 +918,16 @@ class InceptionRNN_v2(Block):
                 and len(self.inception_param) == 7):
             print "[Error]: InceptionRNN block receive seven inception_params."
             exit(0)
-        if not isinstance(self.param[0], list):
-            self.param = [self.param, self.param]
         self.__layers__ = []
 
         self.concat_bottom = []
         if self.inception_param[0]:
             self.c1x1_rnn = ConvRNN_v2(self.name+'/c1x1_rnn', self.bottom,
-                                    self.name+'/c1x1_rnn',
-                                    [self.inception_param[0], self.inception_param[0]],
-                                    self.eltwise_param, self.param,
-                                    self.rnn_shapes[0])
+                    self.name+'/c1x1_rnn',
+                    [self.inception_param[0],
+                     InceptionRNN_v2.no_bias(self.inception_param[0])],
+                    self.sum_rnn_param, self.param,
+                    self.rnn_shapes[0])
             self.__layers__ += self.c1x1_rnn.__layers__
             self.concat_bottom.append(self.name + '/c1x1_rnn')
         else:
@@ -921,17 +941,19 @@ class InceptionRNN_v2(Block):
             print "Info: 3x3 conv not set"
         else:
             self.c3x3_rnn_r = ConvRNN_v2(self.name + '/c3x3_rnn_r', self.bottom,
-                                      self.name + '/c3x3_rnn_r',
-                                      [self.inception_param[1], self.inception_param[1]],
-                                      self.eltwise_param, self.param,
-                                      self.rnn_shapes[1])
+                     self.name + '/c3x3_rnn_r',
+                     [self.inception_param[1],
+                      InceptionRNN_v2.no_bias(self.inception_param[1])],
+                     self.sum_rnn_param, self.param,
+                     self.rnn_shapes[1])
             self.__layers__ += self.c3x3_rnn_r.__layers__
             self.c3x3_rnn = ConvRNN_v2(self.name + '/c3x3_rnn',
-                                    self.name + '/c3x3_rnn_r',
-                                    self.name + '/c3x3_rnn',
-                                    [self.inception_param[2], self.inception_param[2]],
-                                    self.eltwise_param, self.param,
-                                    self.rnn_shapes[2])
+                     self.name + '/c3x3_rnn_r',
+                     self.name + '/c3x3_rnn',
+                     [self.inception_param[2],
+                      InceptionRNN_v2.no_bias(self.inception_param[2])],
+                     self.sum_rnn_param, self.param,
+                     self.rnn_shapes[2])
             self.__layers__ += self.c3x3_rnn.__layers__
             self.concat_bottom.append(self.name + '/c3x3_rnn')
         bool_temp = bool(self.inception_param[3]) + bool(self.inception_param[4])
@@ -943,17 +965,19 @@ class InceptionRNN_v2(Block):
             print "Info: 5x5 conv not set"
         else:
             self.c5x5_rnn_r = ConvRNN_v2(self.name + '/c5x5_rnn_r', self.bottom,
-                                      self.name + '/c5x5_rnn_r',
-                                      [self.inception_param[3], self.inception_param[3]],
-                                      self.eltwise_param, self.param,
-                                      self.rnn_shapes[3])
+                     self.name + '/c5x5_rnn_r',
+                     [self.inception_param[3],
+                      InceptionRNN_v2.no_bias(self.inception_param[3])],
+                     self.sum_rnn_param, self.param,
+                     self.rnn_shapes[3])
             self.__layers__ += self.c5x5_rnn_r.__layers__
             self.c5x5_rnn = ConvRNN_v2(self.name + '/c5x5_rnn',
-                                    self.name + '/c5x5_rnn_r',
-                                    self.name + '/c5x5_rnn',
-                                    [self.inception_param[4], self.inception_param[4]],
-                                    self.eltwise_param, self.param,
-                                    self.rnn_shapes[4])
+                     self.name + '/c5x5_rnn_r',
+                     self.name + '/c5x5_rnn',
+                     [self.inception_param[4],
+                      InceptionRNN_v2.no_bias(self.inception_param[4])],
+                     self.sum_rnn_param, self.param,
+                     self.rnn_shapes[4])
             self.__layers__ += self.c5x5_rnn.__layers__
             self.concat_bottom.append(self.name + '/c5x5_rnn')
         if self.inception_param[5]:
@@ -966,11 +990,12 @@ class InceptionRNN_v2(Block):
             self.concat_bottom.append(self.name + '/pool')
             if self.inception_param[6]:
                 self.pool_pro_rnn = ConvRNN_v2(self.name + '/pool_pro_rnn',
-                                            self.name + '/pool',
-                                            self.name + '/pool_pro',
-                                            [self.inception_param[6], self.inception_param[6]],
-                                            self.eltwise_param, self.param,
-                                            self.rnn_shapes[6])
+                    self.name + '/pool',
+                    self.name + '/pool_pro',
+                    [self.inception_param[6],
+                     InceptionRNN_v2.no_bias(self.inception_param[6])],
+                    self.sum_rnn_param, self.param,
+                    self.rnn_shapes[6])
                 self.__layers__ += self.pool_pro_rnn.__layers__
                 self.concat_bottom[-1] = self.name + '/pool_pro'
         elif self.inception_param[6]:
@@ -978,6 +1003,7 @@ class InceptionRNN_v2(Block):
             exit(0)
         if len(self.concat_bottom) <= 1:
             print "Error: concat_bottom should be more than 1"
+            traceback.print_stack()
             exit(0)
         self.concat = LayerParameter('Concat',
                                      name=self.name + 'concat_1', bottom=self.concat_bottom,
@@ -1070,25 +1096,27 @@ filler_constant_0_2 = FillerParameter('constant', value=0.2)
 filler_xavier = FillerParameter('xavier')
 
 
-def get_cp(num_output, pad, kernel_size, stride, group=0,
+def get_cp(num_output, pad, kernel_size, stride, bias_term=True, group=0,
            weight_filler=filler_xavier,
            bias_filler=filler_constant_0_2):
-    if group == 0:
-        return ConvolutionParam(num_output, pad, kernel_size, stride,
-                                weight_filler=weight_filler,
-                                bias_filler=bias_filler)
-    else:
-        return ConvolutionParam(num_output, pad, kernel_size, stride,
-                                group=2,
-                                weight_filler=weight_filler,
-                                bias_filler=bias_filler)
+    ans = ConvolutionParam(num_output, pad, kernel_size, stride,
+                            weight_filler=weight_filler,
+                            bias_filler=bias_filler)
+    if group != 0:
+        ans.set('group', group)
+    if not bias_term:
+        ans.set('bias_term', False)
+    return ans
 
 
-def get_ipp(num_output, weight_filler=filler_xavier,
+def get_ipp(num_output, bias_term=True, weight_filler=filler_xavier,
             bias_filler=filler_constant_0_2):
-    return InnerProductParameter(num_output,
+    ans = InnerProductParameter(num_output,
                                  weight_filler=weight_filler,
                                  bias_filler=bias_filler)
+    if not bias_term:
+        ans.set('bias_term', False)
+    return ans
 
 if __name__ == '__main__':
     elt_param = EltwiseParameter(Enum('SUM'), coeff=[0.5, 0.5])

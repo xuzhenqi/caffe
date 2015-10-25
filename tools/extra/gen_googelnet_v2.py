@@ -21,7 +21,7 @@ if __name__ == '__main__':
                                               mean_value=[104, 117, 123])
     transform_test = TransformationParameter(mirror=False, crop_size=224,
                                              mean_value=[104, 117, 123])
-    ep_0_5 = EltwiseParameter(Enum('SUM'), coeff=[0.5, 0.5])
+    ep_0_5 = SumRNNParameter(0.5, 0.5)
     lrn_param_5_0_0001_0_75 = LRNParameter(5, 0.0001, 0.75)
     pooling_param_max_3_2 = PoolingParameter(Enum('MAX'), 3, 2)
     pooling_param_max_3_1_1 = PoolingParameter(Enum('MAX'), 3, 1, 1)
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     param_0_2_1 = ParamSpec(0.2, 1)
     param_0_4_0 = ParamSpec(0.4, 0)
 
-    params = [[param_0_2_1, param_0_4_0], [param_1_1, param_2_0]]
+    params = [[param_1_1, param_2_0], param_1_1]
 
     layers = []
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     conv_rnn1 = ConvRNN_v2('conv_rnn1', 'data',
                     'conv_rnn1',
-                    [get_cp(64, 3, 7, 2), get_cp(64, 1, 3, 1)], ep_0_5,
+                    [get_cp(64, 3, 7, 2), get_cp(64, 1, 3, 1, False)], ep_0_5,
                     params, BlobShape(batch_size, 64, 112, 112))
     conv_rnn1.conv.set('name', 'conv1/7x7_s2')
     layers += conv_rnn1.__layers__
@@ -76,12 +76,13 @@ if __name__ == '__main__':
 
     conv_rnn2_r = ConvRNN_v2('conv_rnn2_r', 'lrn1',
                 'conv_rnn2_r',
-                [get_cp(64, 0, 1, 1), get_cp(64, 0, 1, 1)], ep_0_5, params,
+                [get_cp(64, 0, 1, 1), get_cp(64, 0, 1, 1, False)], ep_0_5,
+                params,
                 BlobShape(batch_size, 64, 56, 56))
     conv_rnn2_r.conv.set('name', 'conv2/3x3_reduce')
     conv_rnn2 = ConvRNN_v2('conv_rnn2', 'conv_rnn2_r',
                 'conv_rnn2',
-                [get_cp(192, 1, 3, 1), get_cp(192, 1, 3, 1)],
+                [get_cp(192, 1, 3, 1), get_cp(192, 1, 3, 1, False)],
                 ep_0_5, params, BlobShape(batch_size, 192, 56, 56))
     conv_rnn2.conv.set('name', 'conv2/3x3')
     layers += conv_rnn2_r.__layers__ + conv_rnn2.__layers__
@@ -157,14 +158,14 @@ if __name__ == '__main__':
 
     loss1_conv_rnn = ConvRNN_v2('loss1_conv_rnn', 'loss1_pool',
                         'loss1_conv_rnn',
-                        [get_cp(128, 0, 1, 1), get_cp(128, 0, 1, 1)],
+                        [get_cp(128, 0, 1, 1), get_cp(128, 0, 1, 1, False)],
                         ep_0_5, params, BlobShape(batch_size, 128, 4, 4))
     loss1_conv_rnn.conv.set('name', 'loss1/conv')
     layers += loss1_conv_rnn.__layers__
 
     loss1_fcrnn = IPRNN_v2('loss1_fcrnn', 'loss1_conv_rnn',
                         'loss1_fcrnn',
-                        [get_ipp(1024), get_ipp(1024)], ep_0_5, params,
+                        [get_ipp(1024), get_ipp(1024, False)], ep_0_5, params,
                         BlobShape(batch_size, 1024))
     loss1_fcrnn.ip.set('name', 'loss1/fc')
     layers += loss1_fcrnn.__layers__
@@ -249,15 +250,15 @@ if __name__ == '__main__':
     layers += [loss2_pool]
 
     loss2_conv_rnn = ConvRNN_v2('loss2_conv_rnn', 'loss2_pool',
-                             'loss2_conv_rnn',
-                             [get_cp(128, 0, 1, 1), get_cp(128, 0, 1, 1)],
-                             ep_0_5, params, BlobShape(batch_size, 128, 4, 4))
+              'loss2_conv_rnn',
+              [get_cp(128, 0, 1, 1), get_cp(128, 0, 1, 1, False)],
+              ep_0_5, params, BlobShape(batch_size, 128, 4, 4))
     loss2_conv_rnn.conv.set('name', 'loss2/conv')
     layers += loss2_conv_rnn.__layers__
 
     loss2_fcrnn = IPRNN_v2('loss2_fcrnn', 'loss2_conv_rnn',
                         'loss2_fcrnn',
-                        [get_ipp(1024), get_ipp(1024)], ep_0_5, params,
+                        [get_ipp(1024), get_ipp(1024, False)], ep_0_5, params,
                         BlobShape(batch_size, 1024))
     loss2_fcrnn.ip.set('name', 'loss2/fc')
     layers += loss2_fcrnn.__layers__
@@ -358,7 +359,7 @@ if __name__ == '__main__':
 
     loss3_fcrnn = IPRNN_v2('loss3_fcrnn', 'loss3_drop',
                         'loss3_fcrnn',
-                        [get_ipp(1024), get_ipp(1024)], ep_0_5, params,
+                        [get_ipp(1024), get_ipp(1024, False)], ep_0_5, params,
                         BlobShape(batch_size, 1024))
     loss3_fcrnn.ip.set('name', 'loss3/classifier1')
     layers += loss3_fcrnn.__layers__

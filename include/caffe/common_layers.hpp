@@ -299,6 +299,37 @@ class EltwiseLayer : public Layer<Dtype> {
 };
 
 /**
+ * @brief Compute sum operation on the input blobs, the last blob is
+ * begin_marker.
+ */
+template <typename Dtype>
+class SumRNNLayer : public Layer<Dtype> {
+ public:
+  explicit SumRNNLayer(const LayerParameter& param) : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+  virtual inline const char* type() const { return "SumRNN"; }
+  // The last is begin_marker
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+  inline const vector<Dtype>& GetCoeffs() {return coeffs_; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  vector<Dtype> coeffs_;
+};
+
+/**
  * @brief Takes two+ Blobs, interprets last Blob as a selector and
  *  filter remaining Blobs accordingly with selector data (0 means that
  * the corresponding item has to be filtered, non-zero means that corresponding
