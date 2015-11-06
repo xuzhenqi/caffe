@@ -61,7 +61,6 @@ namespace caffe {
         // Read the file with filenames and labels
         const string& source = this->layer_param_.image_data_param().source();
         LOG(INFO) << "Opening file " << source;
-        std::cout << "opening file " << source << std::endl;
         std::ifstream infile(source.c_str());
         string filename;
         int label, frame;
@@ -83,12 +82,13 @@ namespace caffe {
             LOG(FATAL) << "Skip is not supported.";
         }
         // Read an image, and use it to initialize the top blob.
-        cv::Mat cv_img = ReadImageToCVMat(root_folder + lines_[lines_id_].first + "_1_x.png",
+        cv::Mat cv_img = ReadImageToCVMat(root_folder + lines_[lines_id_]
+                                              .first + "_1_flow.png",
                                           new_height, new_width, is_color);
-        CHECK(cv_img.data) << "Could not load " << lines_[lines_id_].first + "_1_x.png";
+        CHECK(cv_img.data) << "Could not load " << lines_[lines_id_].first +
+            "_1_flow.png";
         // Use data_transformer to infer the expected blob shape from a cv_image.
         vector<int> top_shape = this->data_transformer_->InferBlobShape(cv_img);
-        top_shape[1] *= 2;
         this->transformed_data_.Reshape(top_shape);
         // Reshape prefetch_data and top[0] according to the batch_size.
         const int batch_size = this->layer_param_.image_data_param().batch_size();
@@ -121,31 +121,39 @@ namespace caffe {
                 static_cast<caffe::rng_t*>(prefetch_rng_->generator());
         unifor_gen.reset(new boost::uniform_int<int>(0, lines_.size() - 1));
         // Inistialize min max
+      /*
         const string& min_max_file = this->layer_param_.image_data_rnn_param().min_max();
         infile.open(min_max_file.c_str());
-        float min, max;
-        while(infile >> filename >> min >> max) {
-            min_max_[filename] = make_pair(min, max);
+        vector<float> min_max_temp(6);
+        while(infile >> filename >> min_max_temp[0] >> min_max_temp[1] >>
+            min_max_temp[2] >> min_max_temp[3] >> min_max_temp[4] >>
+              min_max_temp[5]) {
+            min_max_[filename] = min_max_temp;
         }
         LOG(INFO) << "min_max size: " << min_max_.size();
+        */
     }
 
     template <typename Dtype>
-    void ImageDataOptLayer<Dtype>::GetMinMax(const string& filename, float& min, float& max) {
-        vector<string> words;
-        boost::split(words, filename, boost::is_any_of("/"));
+    void ImageDataOptLayer<Dtype>::GetMinMax(const string& filename,
+                                             vector<float>& min_max) {
+        //vector<string> words;
+        //boost::split(words, filename, boost::is_any_of("/"));
         /*
         for(int i = 0; i < words.size(); ++i)
             std::cout << words[i] << "\t";
         std::cout << std::endl;
          */
-        string file = words[words.size() - 1];
-        CHECK(min_max_.count(file));
-        pair<float, float> p = min_max_[file];
-        min = p.first;
-        max = p.second;
-    }
+        //string file = words[words.size() - 1];
+        CHECK(min_max_.count(filename));
+        min_max = min_max_[filename];
 
+    }
+template <typename Dtype>
+void ScaleMatToDatum(const cv::Mat& cv_img, const vector<float>& min_max,
+                     Datum* datum) {
+
+}
     template <typename Dtype>
     void ImageDataOptLayer<Dtype>::InternalThreadEntry() {
         CPUTimer batch_timer;
@@ -170,48 +178,34 @@ namespace caffe {
 
         int line_id_temp, offset;
         Datum datum;
-        vector<string> filenames(2, "");
-        cv::Mat x, y, x1, y1;
+        string filenames_pre;
+        cv::Mat x, x1;
         vector<cv::Mat> mats(2);
-        float min, max;
+        vector<float> min_max_temp(6);
         for (int i = 0; i < batch_size; ++i) {
             line_id_temp = (*unifor_gen)(*prefetch_rng);
             // get a blob
             timer.Start();
-            filenames[0] = root_folder + lines_[line_id_temp].first + "_" +
-                        boost::lexical_cast<string>(current_frame_[line_id_temp]) + "_x.png";
-            filenames[1] = root_folder + lines_[line_id_temp].first + "_" +
-                        boost::lexical_cast<string>(current_frame_[line_id_temp]) + "_y.png";
+            filenames_pre = root_folder + lines_[line_id_temp].first + "_" +
+                        boost::lexical_cast<string>(current_frame_[line_id_temp]);
 
-            x = ReadImageToCVMat(filenames[0], new_height, new_width, is_color);
-            GetMinMax(filenames[0], min, max);
-            x.convertTo(x1, CV_32F, (max - min) / 255., min);
-            y = ReadImageToCVMat(filenames[1], new_height, new_width, is_color);
-            GetMinMax(filenames[1], min, max);
-            y.convertTo(y1, CV_32F, (max - min) / 255., min);
-            mats[0] = x1;
-            mats[1] = y1;
-            CVMatsToDatum(mats, &datum);
+            x = ReadImageToCVMat(filenames_pre + "_flow.png", new_height,
+                                 new_width, is_color);
+            //GetMinMax(filenames_pre, min_max_temp);
+            CVMatToDatum(x, &datum);
             // Apply transformations (mirror, crop...) to the image
             offset = this->prefetch_data_[0]->offset(i);
             this->transformed_data_.set_cpu_data(
                     prefetch_data_[0]->mutable_cpu_data() + offset);
             this->data_transformer_->Transform(datum, &(this->transformed_data_));
             if (rnn_) {
-                filenames[0] = root_folder + lines_[line_id_temp].first + "_" +
-                               boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + "_x.png";
-                filenames[1] = root_folder + lines_[line_id_temp].first + "_" +
-                               boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_) + "_y.png";
+                filenames_pre = root_folder + lines_[line_id_temp].first + "_" +
+                               boost::lexical_cast<string>(current_frame_[line_id_temp] + fps_);
 
-                x = ReadImageToCVMat(filenames[0], new_height, new_width, is_color);
-                GetMinMax(filenames[0], min, max);
-                x.convertTo(x1, CV_32F, (max - min) / 255., min);
-                y = ReadImageToCVMat(filenames[1], new_height, new_width, is_color);
-                GetMinMax(filenames[1], min, max);
-                y.convertTo(y1, CV_32F, (max - min) / 255., min);
-                mats[0] = x1;
-                mats[1] = y1;
-                CVMatsToDatum(mats, &datum);
+                x = ReadImageToCVMat(filenames_pre + "_flow.png", new_height,
+                                     new_width, is_color);
+                //GetMinMax(filenames_pre, min_max_temp);
+                CVMatToDatum(x, &datum);
                 // Apply transformations (mirror, crop...) to the image
                 offset = this->prefetch_data_[2]->offset(i);
                 this->transformed_data_.set_cpu_data(

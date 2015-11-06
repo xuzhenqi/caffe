@@ -350,7 +350,9 @@ public:
 
 protected:
     virtual void InternalThreadEntry();
-    void GetMinMax(const string& filename, float& min, float& max);
+    inline void GetMinMax(const string& filename, vector<float>& min_max);
+    void ScaleMatToDatum(const cv::Mat& cv_img, const vector<float>& min_max,
+                         Datum* datum);
     shared_ptr<Caffe::RNG> prefetch_rng_;
     shared_ptr<boost::uniform_int<int> > unifor_gen;
 
@@ -359,7 +361,7 @@ protected:
     vector<int> current_frame_;
     vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
     Blob<Dtype> transformed_data_;
-    map<string, pair<float, float> > min_max_;
+    map<string, vector<float> > min_max_;
     int lines_id_;
     int fps_;
     bool rnn_;
