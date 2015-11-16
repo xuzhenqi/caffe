@@ -43,6 +43,7 @@ namespace caffe {
     void ImageDataOptLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
                                                   const vector<Blob<Dtype>*>& top) {
         this->output_labels_ = true;
+        fps_ = this->layer_param_.image_data_rnn_param().fps();
 
         const int new_height = this->layer_param_.image_data_param().new_height();
         const int new_width  = this->layer_param_.image_data_param().new_width();
@@ -82,7 +83,7 @@ namespace caffe {
         CHECK(cv_img.data) << "Could not load " << lines_[lines_id_].first + "_1_x.png";
         // Use data_transformer to infer the expected blob shape from a cv_image.
         vector<int> top_shape = this->data_transformer_->InferBlobShape(cv_img);
-        top_shape[1] *= 2;
+        top_shape[1] *= 2 * fps_;
         this->transformed_data_.Reshape(top_shape);
         // Reshape prefetch_data and top[0] according to the batch_size.
         const int batch_size = this->layer_param_.image_data_param().batch_size();
@@ -100,9 +101,6 @@ namespace caffe {
         top[1]->Reshape(label_shape);
         this->prefetch_data_[1]->Reshape(label_shape);
 
-        fps_ = this->layer_param_.image_data_rnn_param().fps();
-        CHECK(current_frame_.empty());
-        current_frame_.insert(current_frame_.begin(), lines_.size(), 1);
         const unsigned int prefetch_rng_seed = caffe_rng_rand();
         prefetch_rng_.reset(new Caffe::RNG(prefetch_rng_seed));
         caffe::rng_t* prefetch_rng =
@@ -128,7 +126,7 @@ namespace caffe {
         std::cout << std::endl;
          */
         string file = words[words.size() - 1];
-        CHECK(min_max.count(file));
+        CHECK(min_max.count(file)) << file;
         pair<float, float> p = min_max[file];
         min = p.first;
         max = p.second;
@@ -154,41 +152,45 @@ namespace caffe {
                 static_cast<caffe::rng_t*>(prefetch_rng_->generator());
         Dtype* prefetch_label = this->prefetch_data_[1]->mutable_cpu_data();
 
-        int line_id_temp, offset;
+        int line_id_temp, frame_index, offset;
         Datum datum;
-        vector<string> filenames(2, "");
-        cv::Mat x, y, x1, y1;
-        vector<cv::Mat> mats(2);
+        string filename;
+        cv::Mat x, x1;
+        vector<cv::Mat> mats(2*fps_);
         float min, max;
         for (int i = 0; i < batch_size; ++i) {
             line_id_temp = (*unifor_gen)(*prefetch_rng);
+            frame_index = caffe_rng_rand() % (frames_[line_id_temp] - 4*
+                (fps_-1)) + 1;
             // get a blob
             timer.Start();
-            filenames[0] = root_folder + lines_[line_id_temp].first + "_" +
-                        boost::lexical_cast<string>(current_frame_[line_id_temp]) + "_x.png";
-            filenames[1] = root_folder + lines_[line_id_temp].first + "_" +
-                        boost::lexical_cast<string>(current_frame_[line_id_temp]) + "_y.png";
-
-            x = ReadImageToCVMat(filenames[0], new_height, new_width, is_color);
-            GetMinMax(filenames[0], min, max);
-            x.convertTo(x1, CV_32F, (max - min) / 255., min);
-            y = ReadImageToCVMat(filenames[1], new_height, new_width, is_color);
-            GetMinMax(filenames[1], min, max);
-            y.convertTo(y1, CV_32F, (max - min) / 255., min);
-            mats[0] = x1;
-            mats[1] = y1;
+            for (int fi = 0; fi < fps_; ++fi) {
+              filename = root_folder + lines_[line_id_temp].first + "_" +
+                  boost::lexical_cast<string>(frame_index + fi*4) + "_x.png";
+              x = ReadImageToCVMat(filename, new_height, new_width, is_color);
+              CHECK(x.data) << filename << " does not exist!";
+              GetMinMax(filename, min, max);
+              x.convertTo(x1, CV_32F, (max - min) / 255., min);
+              //x.convertTo(x1, CV_32F);
+              mats[fi*2] = x1.clone();
+              filename = root_folder + lines_[line_id_temp].first + "_" +
+                  boost::lexical_cast<string>(frame_index + fi*4) + "_y.png";
+              x = ReadImageToCVMat(filename, new_height, new_width, is_color);
+              CHECK(x.data) << filename << " does not exist!";
+              GetMinMax(filename, min, max);
+              x.convertTo(x1, CV_32F, (max - min) / 255., min);
+              //x.convertTo(x1, CV_32F);
+              mats[fi*2 + 1] = x1.clone();
+            }
             CVMatsToDatum(mats, &datum);
             // Apply transformations (mirror, crop...) to the image
             offset = this->prefetch_data_[0]->offset(i);
             this->transformed_data_.set_cpu_data(
-                    prefetch_data_[0]->mutable_cpu_data() + offset);
-            this->data_transformer_->Transform(datum, &(this->transformed_data_));
+              prefetch_data_[0]->mutable_cpu_data() + offset);
+            this->data_transformer_->Transform(datum,
+                                             &(this->transformed_data_));
             // Reading label
             prefetch_label[i] = lines_[line_id_temp].second;
-            current_frame_[line_id_temp] += fps_;
-            if (current_frame_[line_id_temp] > frames_[line_id_temp]) {
-                current_frame_[line_id_temp] = 1;
-            }
             trans_time += timer.MicroSeconds();
         }
         //std::cout << filenames[0] << "\t\t" << filenames[1] << "\t\t" << prefetch_label[4] << "\t\t"

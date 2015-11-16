@@ -35,7 +35,7 @@ class ImageDataOptLayerTest : public MultiDeviceTest<TypeParam> {
     Caffe::set_random_seed(seed_);
     // TODO: make the test source available in test dir.
     source_ = string("/mnt/dataset3/small/source.txt");
-    root_dir_ = string("/mnt/dataset3/images/optflow/");
+    root_dir_ = string("/mnt/dataset3/small/optflow/");
   }
   
   int seed_;
@@ -56,14 +56,17 @@ TYPED_TEST(ImageDataOptLayerTest, TestSetUp) {
   image_data_param->set_source(this->source_.c_str());
   image_data_param->set_shuffle(false);
   image_data_param->set_root_folder(this->root_dir_.c_str());
+  ImageDataRNNParameter* image_data_rnn_param = param
+      .mutable_image_data_rnn_param();
+  image_data_rnn_param->set_fps(5);
   ImageDataOptLayer<Dtype> layer(param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   EXPECT_EQ(this->blob_top_vec_[0]->num(), 5);
-  EXPECT_EQ(this->blob_top_vec_[0]->channels(), 2);
-  EXPECT_EQ(this->blob_top_vec_[0]->height(), 240);
-  EXPECT_EQ(this->blob_top_vec_[0]->width(), 320);
+  EXPECT_EQ(this->blob_top_vec_[0]->channels(), 10);
+  EXPECT_EQ(this->blob_top_vec_[0]->height(), 256);
+  EXPECT_EQ(this->blob_top_vec_[0]->width(), 256);
   EXPECT_EQ(this->blob_top_vec_[1]->count(), 5);
-  for(int i=0; i<100; ++i)
+  for(int i=0; i<10; ++i)
     layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   // Generating Images
   DumpMatrixToTxt("temp/images.txt",

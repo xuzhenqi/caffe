@@ -150,6 +150,15 @@ TYPED_TEST(CPUMathFunctionsTest, TestCopy) {
   }
 }
 
+TYPED_TEST(CPUMathFunctionsTest, TestRand) {
+  for (int i = 0; i < 20; ++i) {
+    for (int j = 0; j < 20; ++j) {
+      std::cout << caffe_rng_rand() << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
 #ifndef CPU_ONLY
 
 template <typename Dtype>

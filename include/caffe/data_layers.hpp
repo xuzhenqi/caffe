@@ -355,7 +355,6 @@ protected:
 
     vector<std::pair<std::string, int> > lines_;
     vector<int> frames_;
-    vector<int> current_frame_;
     vector<shared_ptr<Blob<Dtype> > > prefetch_data_;
     Blob<Dtype> transformed_data_;
     map<string, pair<float, float> > min_max;
