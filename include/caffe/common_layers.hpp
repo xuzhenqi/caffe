@@ -467,6 +467,39 @@ class FlattenLayer : public Layer<Dtype> {
 };
 
 /**
+ * @brief Gaussian Mapping layer generate a gauss mapping given mean and std,
+ * the mean value was stored in the bottom data, and std is a parameter.
+ */
+template <typename Dtype>
+class GaussMapLayer : public Layer<Dtype> {
+ public:
+  explicit GaussMapLayer(const LayerParameter& param): Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+  virtual inline const char* type() const { return "GaussMap"; }
+  virtual inline bool EqualNumBottomTopBlobs() const { return true; }
+  virtual inline int MinTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top) { NOT_IMPLEMENTED; }
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down,
+                            const vector<Blob<Dtype>*>& bottom) {
+    NOT_IMPLEMENTED;
+  }
+
+  Dtype std_;
+  int width_;
+  int height_;
+};
+
+/**
  * @brief Also known as a "fully-connected" layer, computes an inner product
  *        with a set of learned weights, and (optionally) adds biases.
  *

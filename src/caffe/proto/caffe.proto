@@ -306,7 +306,8 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 140 (last added: batch_norm_param)
+// LayerParameter next available layer-specific ID: 141 (last added:
+// gaussmap_param).
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -366,6 +367,7 @@ message LayerParameter {
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
+  optional GaussMapParameter gaussmap_param = 140;
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
@@ -393,8 +395,15 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
 }
 
+// Message that stores parameters used to generate gauss map.
+message GaussMapParameter {
+  optional float std = 1 [default = 4];
+  optional int32 width = 2 [default = 128];
+  optional int32 height = 3 [default = 128];
+}
+
 // Message that stores parameters used to apply transformation
-// to the data layer's data
+// to the layer's data
 message TransformationParameter {
   // For data pre-processing, we can do simple scaling and subtracting the
   // data mean, if provided. Note that the mean subtraction is always carried

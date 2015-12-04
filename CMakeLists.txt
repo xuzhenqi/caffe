@@ -56,7 +56,7 @@ caffe_warnings_disable(CMAKE_CXX_FLAGS -Wno-sign-compare -Wno-uninitialized)
 configure_file(cmake/Templates/caffe_config.h.in "${PROJECT_BINARY_DIR}/caffe_config.h")
 
 # ---[ Includes
-set(Caffe_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(Caffe_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/build/src)
 include_directories(${Caffe_INCLUDE_DIR} ${PROJECT_BINARY_DIR})
 include_directories(BEFORE src) # This is needed for gtest.
 
