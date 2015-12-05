@@ -146,6 +146,42 @@ class DummyDataLayer : public Layer<Dtype> {
 };
 
 /**
+ * @brief Load data for face detection task, this layer will return one data
+ * blob and four label blobs (scale 1, 1/4, 1/8, 1/16). Each label blob
+ * contains five channels. (left eye, right eye, nose, left mouse, right mouse)
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
+ public:
+  explicit FaceDetectionDataLayer(const LayerParameter& param)
+      : BasePrefetchingDataLayer<Dtype>(param) {}
+  virtual ~FaceDetectionDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                              const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "FaceDetectionData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 5; }
+
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top) {NOT_IMPLEMENTED;}
+
+ protected:
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+  virtual void ShuffleImages();
+  virtual void load_batch(Batch<Dtype>* batch);
+  void gauss_map(int x, int y, int height, int width, Dtype* map);
+
+  vector<std::pair<std::string, vector<int> > > lines_;
+  int lines_id_;
+  Dtype std_;
+};
+
+/**
  * @brief Provides data to the Net from HDF5 files.
  *
  * TODO(dox): thorough documentation for Forward and proto params.
