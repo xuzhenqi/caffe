@@ -93,3 +93,9 @@ LOCK
 LOG*
 CURRENT
 MANIFEST-*
+
+# User defined
+.*
+log
+*tag*
+.gitignore

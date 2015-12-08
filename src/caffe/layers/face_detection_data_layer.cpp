@@ -24,6 +24,7 @@ template <typename Dtype>
 void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   std_ = this->layer_param_.gaussmap_param().std();
+  points_ = this->layer_param_.gaussmap_param().points();
   const int new_height = this->layer_param_.image_data_param().new_height();
   const int new_width  = this->layer_param_.image_data_param().new_width();
   const bool is_color  = this->layer_param_.image_data_param().is_color();
@@ -37,9 +38,11 @@ void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& b
   LOG(INFO) << "Opening file " << source;
   std::ifstream infile(source.c_str());
   string filename;
-  vector<int> label(10); //lex, ley, rex, rey, nx, ny, mlx, mly, mrx, mry;
-  while (infile >> filename >> label[0] >> label[1] >> label[2] >> label[3]
-      >> label[4] >> label[5] >> label[6] >> label[7] >> label[8] >> label[9]) {
+  vector<Dtype> label(2 * points_);
+  while (infile >> filename) {
+    for (int i = 0; i < 2 * points_; ++i) {
+      infile >> label[i];
+    }
     lines_.push_back(std::make_pair(filename, label));
   }
 
@@ -83,16 +86,16 @@ void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& b
   // label
   vector<int> label_shape(2, 0);
   label_shape[0] = batch_size;
-  label_shape[1] = 10;
+  label_shape[1] = 2 * points_;
   for (int i = 0; i < this->PREFETCH_COUNT; ++i) {
     this->prefetch_[i].label_.Reshape(label_shape);
   }
   int height = top_shape[2], width = top_shape[3];
   CHECK_EQ(height%16, 0) << "height % 16 != 0";
-  top[1]->Reshape(batch_size, 5, height, width);
-  top[2]->Reshape(batch_size, 5, height/4, width/4);
-  top[3]->Reshape(batch_size, 5, height/8, width/8);
-  top[4]->Reshape(batch_size, 5, height/16, width/16);
+  top[1]->Reshape(batch_size, points_, height, width);
+  top[2]->Reshape(batch_size, points_, height/4, width/4);
+  top[3]->Reshape(batch_size, points_, height/8, width/8);
+  top[4]->Reshape(batch_size, points_, height/16, width/16);
 }
 
 template <typename Dtype>
@@ -136,7 +139,6 @@ void FaceDetectionDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
 
   // datum scales
   const int lines_size = lines_.size();
-  const int label_item_size = lines_[lines_id_].second.size();
   for (int item_id = 0; item_id < batch_size; ++item_id) {
     // get a blob
     timer.Start();
@@ -152,8 +154,8 @@ void FaceDetectionDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
     trans_time += timer.MicroSeconds();
 
-    for (int i = 0; i < label_item_size; ++i) {
-      prefetch_label[item_id*label_item_size + i] = lines_[lines_id_].second[i];
+    for (int i = 0; i < 2 * points_;  ++i) {
+      prefetch_label[item_id *2 * points_ + i] = lines_[lines_id_].second[i];
     }
     // go to the next iter
     lines_id_++;
@@ -173,8 +175,8 @@ void FaceDetectionDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
 }
 
 template <typename Dtype>
-void FaceDetectionDataLayer<Dtype>::gauss_map(int x,
-                                              int y,
+void FaceDetectionDataLayer<Dtype>::gauss_map(float x,
+                                              float y,
                                               int height,
                                               int width,
                                               Dtype *map) {
@@ -200,20 +202,21 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   // Reshape to loaded labels.
   const int width = top[0]->width(), height = top[0]->height();
   const int num = top[0]->num();
-  top[1]->Reshape(num, 5, height, width);
-  top[2]->Reshape(num, 5, height/4, width/4);
-  top[3]->Reshape(num, 5, height/8, width/8);
-  top[4]->Reshape(num, 5, height/16, width/16);
+  top[1]->Reshape(num, points_, height, width);
+  top[2]->Reshape(num, points_, height/4, width/4);
+  top[3]->Reshape(num, points_, height/8, width/8);
+  top[4]->Reshape(num, points_, height/16, width/16);
   Dtype* label_data = batch->label_.mutable_cpu_data();
   for (int i = 0; i < num; ++i) {
-    for (int j = 0; j < 5; ++j) {
-      gauss_map(label_data[i*10+2*j], label_data[i*10+2*j+1], height, width,
+    for (int j = 0; j < points_; ++j) {
+      gauss_map(label_data[i*2*points_+2*j], label_data[i*2*points_+2*j+1],
+                height, width,
                 top[1]->mutable_cpu_data() + top[1]->offset(i, j));
     }
   }
   const Dtype* big_map = top[1]->cpu_data();
   Dtype* small_map = top[2]->mutable_cpu_data();
-  for (int i = 0; i < num * 5; ++i) {
+  for (int i = 0; i < num * points_; ++i) {
     for (int h = 0; h < height/4; ++h) {
       for (int w = 0; w < width/4; ++w) {
         *(small_map) = *(big_map);
@@ -225,7 +228,7 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   }
   big_map = top[1]->cpu_data();
   small_map = top[3]->mutable_cpu_data();
-  for (int i = 0; i < num * 5; ++i) {
+  for (int i = 0; i < num * points_; ++i) {
     for (int h = 0; h < height/8; ++ h) {
       for (int w = 0; w < width/8; ++w) {
         *(small_map) = *(big_map);
@@ -237,7 +240,7 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   }
   big_map = top[1]->cpu_data();
   small_map = top[4]->mutable_cpu_data();
-  for (int i = 0; i < num * 5; ++i) {
+  for (int i = 0; i < num * points_; ++i) {
     for (int h = 0; h < height/16; ++h) {
       for (int w = 0; w < width/16; ++w) {
         *(small_map) = *(big_map);

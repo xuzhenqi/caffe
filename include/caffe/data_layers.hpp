@@ -168,17 +168,18 @@ class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                            const vector<Blob<Dtype>*>& top);
   virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-                           const vector<Blob<Dtype>*>& top) {NOT_IMPLEMENTED;}
+                           const vector<Blob<Dtype>*>& top);
 
  protected:
   shared_ptr<Caffe::RNG> prefetch_rng_;
   virtual void ShuffleImages();
   virtual void load_batch(Batch<Dtype>* batch);
-  void gauss_map(int x, int y, int height, int width, Dtype* map);
+  void gauss_map(float x, float y, int height, int width, Dtype* map);
 
-  vector<std::pair<std::string, vector<int> > > lines_;
+  vector<std::pair<std::string, vector<Dtype> > > lines_;
   int lines_id_;
   Dtype std_;
+  int points_;
 };
 
 /**

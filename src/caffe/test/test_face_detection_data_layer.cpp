@@ -5,7 +5,6 @@
 #include "gtest/gtest.h"
 
 #include "caffe/blob.hpp"
-#include "caffe/filler.hpp"
 #include "caffe/data_layers.hpp"
 #include "caffe/test/test_caffe_main.hpp"
 #include "caffe/util/io.hpp"
@@ -17,8 +16,9 @@ class FaceDetectionDataLayerTest : public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;
 
  protected:
-  FaceDetectionDataLayerTest() : filename_(EXAMPLES_SOURCE_DIR
-                                              "images/eye_loc_temp.txt"){
+  FaceDetectionDataLayerTest() :
+      points_(5),
+      filename_(EXAMPLES_SOURCE_DIR "images/eye_loc_temp.txt"){
     Caffe::set_random_seed(1701);
     for (int i = 0; i < 5; ++i){
       blob_top_vec_.push_back(new Blob<Dtype>);
@@ -27,8 +27,8 @@ class FaceDetectionDataLayerTest : public MultiDeviceTest<TypeParam> {
     string temp;
     int index = 0;
     while (source >> temp) {
-      labels_.push_back(vector<int>(10, 0));
-      for (int i = 0; i < 10; ++i) {
+      labels_.push_back(vector<int>(2 * points_, 0));
+      for (int i = 0; i < 2 * points_; ++i) {
         source >> labels_[index][i];
       }
       ++index;
@@ -45,6 +45,7 @@ class FaceDetectionDataLayerTest : public MultiDeviceTest<TypeParam> {
   vector<Blob<Dtype>*> blob_top_vec_;
   string filename_;
   vector<vector<int> > labels_;
+  int points_;
 };
 
 TYPED_TEST_CASE(FaceDetectionDataLayerTest, TestDtypesAndDevices);
@@ -56,6 +57,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
   GaussMapParameter* gaussMapParameter = layerParameter
       .mutable_gaussmap_param();
   gaussMapParameter->set_std(4);
+  gaussMapParameter->set_points(this->points_);
   ImageDataParameter* imageDataParameter = layerParameter
       .mutable_image_data_param();
   imageDataParameter->set_batch_size(2);
@@ -72,22 +74,22 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
   EXPECT_EQ(this->blob_top_vec_[0]->width(), 128);
 
   EXPECT_EQ(this->blob_top_vec_[1]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_[1]->channels(), 5);
+  EXPECT_EQ(this->blob_top_vec_[1]->channels(), this->points_);
   EXPECT_EQ(this->blob_top_vec_[1]->height(), 128);
   EXPECT_EQ(this->blob_top_vec_[1]->width(), 128);
 
   EXPECT_EQ(this->blob_top_vec_[2]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_[2]->channels(), 5);
+  EXPECT_EQ(this->blob_top_vec_[2]->channels(), this->points_);
   EXPECT_EQ(this->blob_top_vec_[2]->height(), 32);
   EXPECT_EQ(this->blob_top_vec_[2]->width(), 32);
 
   EXPECT_EQ(this->blob_top_vec_[3]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_[3]->channels(), 5);
+  EXPECT_EQ(this->blob_top_vec_[3]->channels(), this->points_);
   EXPECT_EQ(this->blob_top_vec_[3]->height(), 16);
   EXPECT_EQ(this->blob_top_vec_[3]->width(), 16);
 
   EXPECT_EQ(this->blob_top_vec_[4]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_[4]->channels(), 5);
+  EXPECT_EQ(this->blob_top_vec_[4]->channels(), this->points_);
   EXPECT_EQ(this->blob_top_vec_[4]->height(), 8);
   EXPECT_EQ(this->blob_top_vec_[4]->width(), 8);
 
@@ -95,7 +97,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
 
   int loc_width, loc_height, peak;
   for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < 5; ++c) {
+    for (int c = 0; c < this->points_; ++c) {
       loc_width = 0;
       loc_height = 0;
       peak = 0;
@@ -115,7 +117,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
   }
 
   for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < 5; ++c) {
+    for (int c = 0; c < this->points_; ++c) {
       for (int h = 0; h < 8; ++h) {
         for (int w = 0; w < 8; ++w) {
           CHECK_NEAR(this->blob_top_vec_[4]->data_at(n, c, h, w),
@@ -126,7 +128,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
   }
 
   for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < 5; ++c) {
+    for (int c = 0; c < this->points_; ++c) {
       for (int h = 0; h < 16; ++h) {
         for (int w = 0; w < 16; ++w) {
           CHECK_NEAR(this->blob_top_vec_[3]->data_at(n, c, h, w),
@@ -137,7 +139,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
   }
 
   for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < 5; ++c) {
+    for (int c = 0; c < this->points_; ++c) {
       for (int h = 0; h < 32; ++h) {
         for (int w = 0; w < 32; ++w) {
           CHECK_NEAR(this->blob_top_vec_[2]->data_at(n, c, h, w),
