@@ -95,7 +95,8 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
 
   layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
 
-  int loc_width, loc_height, peak;
+  int loc_width, loc_height;
+  Dtype peak;
   for (int n = 0; n < 2; ++n) {
     for (int c = 0; c < this->points_; ++c) {
       loc_width = 0;
@@ -116,6 +117,40 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
     }
   }
 
+  Dtype sum;
+  const Dtype *data;
+  for (int n = 0; n< 2; ++n) {
+    for (int c = 0; c < this->points_; ++c) {
+      sum = 0;
+      data = this->blob_top_vec_[1]->cpu_data() +
+          this->blob_top_vec_[1]->offset(n,c);
+      for (int i = 0; i < 128*128; ++i)
+        sum += data[i];
+      CHECK_NEAR(1, sum, 1e-5);
+
+      sum = 0;
+      data = this->blob_top_vec_[2]->cpu_data() +
+          this->blob_top_vec_[2]->offset(n,c);
+      for (int i = 0; i < 32*32; ++i)
+        sum += data[i];
+      CHECK_NEAR(1, sum, 1e-5);
+
+      sum = 0;
+      data = this->blob_top_vec_[3]->cpu_data() +
+          this->blob_top_vec_[3]->offset(n,c);
+      for (int i = 0; i < 16*16; ++i)
+        sum += data[i];
+      CHECK_NEAR(1, sum, 1e-5);
+
+      sum = 0;
+      data = this->blob_top_vec_[4]->cpu_data() +
+          this->blob_top_vec_[4]->offset(n,c);
+      for (int i = 0; i < 8*8; ++i)
+        sum += data[i];
+      CHECK_NEAR(1, sum, 1e-5);
+    }
+  }
+/*
   for (int n = 0; n < 2; ++n) {
     for (int c = 0; c < this->points_; ++c) {
       for (int h = 0; h < 8; ++h) {
@@ -148,6 +183,7 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
       }
     }
   }
+*/
 
 }
 

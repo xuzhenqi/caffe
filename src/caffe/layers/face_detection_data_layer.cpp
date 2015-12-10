@@ -188,6 +188,17 @@ void FaceDetectionDataLayer<Dtype>::gauss_map(float x,
 }
 
 template <typename Dtype>
+void FaceDetectionDataLayer<Dtype>::regularize(int num, Dtype *map) {
+  Dtype sum = 0;
+  for (int i = 0; i < num; ++i) {
+    sum += map[i];
+  }
+  for (int i = 0; i < num; ++i) {
+    map[i] /= sum;
+  }
+}
+
+template <typename Dtype>
 void FaceDetectionDataLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   Batch<Dtype>* batch = this->prefetch_full_.pop("Data layer prefetch queue "
@@ -206,14 +217,18 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   top[2]->Reshape(num, points_, height/4, width/4);
   top[3]->Reshape(num, points_, height/8, width/8);
   top[4]->Reshape(num, points_, height/16, width/16);
+
   Dtype* label_data = batch->label_.mutable_cpu_data();
   for (int i = 0; i < num; ++i) {
     for (int j = 0; j < points_; ++j) {
       gauss_map(label_data[i*2*points_+2*j], label_data[i*2*points_+2*j+1],
                 height, width,
                 top[1]->mutable_cpu_data() + top[1]->offset(i, j));
+      regularize(height * width,
+                 top[1]->mutable_cpu_data() + top[1]->offset(i, j));
     }
   }
+
   const Dtype* big_map = top[1]->cpu_data();
   Dtype* small_map = top[2]->mutable_cpu_data();
   for (int i = 0; i < num * points_; ++i) {
@@ -225,7 +240,9 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
       }
       big_map += 3 * width;
     }
+    regularize(height/4 * width/4, small_map - height / 4 * width / 4);
   }
+
   big_map = top[1]->cpu_data();
   small_map = top[3]->mutable_cpu_data();
   for (int i = 0; i < num * points_; ++i) {
@@ -237,7 +254,9 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
       }
       big_map += 7 * width;
     }
+    regularize(height/8 * width/8, small_map - height / 8 * width / 8);
   }
+
   big_map = top[1]->cpu_data();
   small_map = top[4]->mutable_cpu_data();
   for (int i = 0; i < num * points_; ++i) {
@@ -249,6 +268,7 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
       }
       big_map += 15 * width;
     }
+    regularize(height/16 * width/16, small_map - height / 16 * width / 16);
   }
 
   this->prefetch_free_.push(batch);

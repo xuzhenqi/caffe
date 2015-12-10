@@ -175,6 +175,7 @@ class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual void ShuffleImages();
   virtual void load_batch(Batch<Dtype>* batch);
   void gauss_map(float x, float y, int height, int width, Dtype* map);
+  void regularize(int num, Dtype* map);
 
   vector<std::pair<std::string, vector<Dtype> > > lines_;
   int lines_id_;
