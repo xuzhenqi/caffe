@@ -401,6 +401,7 @@ message GaussMapParameter {
   optional int32 width = 2 [default = 128];
   optional int32 height = 3 [default = 128];
   optional int32 points = 4 [default = 5]; // Todo: move this to a new message.
+  repeated int32 scale = 5;
 }
 
 // Message that stores parameters used to apply transformation

@@ -163,7 +163,7 @@ class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
 
   virtual inline const char* type() const { return "FaceDetectionData"; }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
-  virtual inline int ExactNumTopBlobs() const { return 5; }
+  virtual inline int MinTopBlobs() const { return 1; }
 
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                            const vector<Blob<Dtype>*>& top);
@@ -179,8 +179,10 @@ class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
 
   vector<std::pair<std::string, vector<Dtype> > > lines_;
   int lines_id_;
+
   Dtype std_;
   int points_;
+  vector<int> scales_;
 };
 
 /**

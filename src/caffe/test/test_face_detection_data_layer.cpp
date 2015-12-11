@@ -58,6 +58,9 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
       .mutable_gaussmap_param();
   gaussMapParameter->set_std(4);
   gaussMapParameter->set_points(this->points_);
+  gaussMapParameter->add_scale(4);
+  gaussMapParameter->add_scale(8);
+  gaussMapParameter->add_scale(16);
   ImageDataParameter* imageDataParameter = layerParameter
       .mutable_image_data_param();
   imageDataParameter->set_batch_size(2);
@@ -150,40 +153,6 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForward) {
       CHECK_NEAR(1, sum, 1e-5);
     }
   }
-/*
-  for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < this->points_; ++c) {
-      for (int h = 0; h < 8; ++h) {
-        for (int w = 0; w < 8; ++w) {
-          CHECK_NEAR(this->blob_top_vec_[4]->data_at(n, c, h, w),
-                   this->blob_top_vec_[1]->data_at(n, c, 16*h, 16*w), 1e-6);
-        }
-      }
-    }
-  }
-
-  for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < this->points_; ++c) {
-      for (int h = 0; h < 16; ++h) {
-        for (int w = 0; w < 16; ++w) {
-          CHECK_NEAR(this->blob_top_vec_[3]->data_at(n, c, h, w),
-                   this->blob_top_vec_[1]->data_at(n, c, 8*h, 8*w), 1e-6);
-        }
-      }
-    }
-  }
-
-  for (int n = 0; n < 2; ++n) {
-    for (int c = 0; c < this->points_; ++c) {
-      for (int h = 0; h < 32; ++h) {
-        for (int w = 0; w < 32; ++w) {
-          CHECK_NEAR(this->blob_top_vec_[2]->data_at(n, c, h, w),
-                   this->blob_top_vec_[1]->data_at(n, c, 4*h, 4*w), 1e-6);
-        }
-      }
-    }
-  }
-*/
 
 }
 
