@@ -59,6 +59,8 @@ message FillerParameter {
     AVERAGE = 2;
   }
   optional VarianceNorm variance_norm = 8 [default = FAN_IN];
+  // scale parameter for 'bilinear'. TODO: expand to 'xavier' and 'msra'
+  optional float scale = 9 [default = 1.];
 }
 
 message NetParameter {

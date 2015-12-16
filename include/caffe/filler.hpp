@@ -258,6 +258,9 @@ class BilinearFiller : public Filler<Dtype> {
     }
     CHECK_EQ(this->filler_param_.sparse(), -1)
          << "Sparsity not supported by this Filler.";
+    caffe_cpu_scale(blob->count(), Dtype(this->filler_param_.scale()),
+                    blob->cpu_data(),
+                    blob->mutable_cpu_data());
   }
 };
 
