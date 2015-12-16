@@ -13,6 +13,8 @@ __global__ void caffe_gpu_max(const int N, const Dtype alpha, const Dtype *x,
   CUDA_KERNEL_LOOP(index, N) {
     if (x[index] < alpha)
       y[index] = alpha;
+    else 
+      y[index] = x[index];
   }
 }
 
@@ -26,13 +28,17 @@ void SoftmaxEntropyLossLayer<Dtype>::Forward_gpu(
   Dtype* prob_data = prob_.mutable_gpu_data();
   const Dtype* label = bottom[1]->gpu_data();
   Dtype *temp = prob_.mutable_gpu_diff();
+  Dtype *temp1 = bottom[1]->mutable_gpu_diff();
   const int count = prob_.count();
   
   caffe_gpu_max<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, Dtype(FLT_MIN), prob_data, prob_data);
-  caffe_gpu_log(count, prob_data, temp);
+  caffe_gpu_max<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+      count, Dtype(FLT_MIN), label, temp1);
+  caffe_gpu_div(count, temp1, prob_data, temp);
+  caffe_gpu_log(count, temp, temp);
   caffe_gpu_dot(count, temp, label, top[0]->mutable_cpu_data());
-  top[0]->mutable_cpu_data()[0] /= -outer_num_;
+  top[0]->mutable_cpu_data()[0] /= outer_num_;
 }
 
 template <typename Dtype>

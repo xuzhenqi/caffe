@@ -97,14 +97,32 @@ TYPED_TEST(SoftmaxEntropyLossLayerTest, TestForward) {
     for (int c = 0; c < this->blob_bottom_label_->channels(); ++c) {
       for (int h = 0; h < this->blob_bottom_label_->height(); ++h) {
         for (int w = 0; w < this->blob_bottom_label_->width(); ++w) {
-          loss -= this->blob_bottom_label_->data_at(n, c, h, w) * log(std::max
-              (Dtype(FLT_MIN), this->blob_top_softmax_->data_at(n, c, h, w)));
+          loss += this->blob_bottom_label_->data_at(n, c, h, w) *
+              (log(std::max(Dtype(FLT_MIN), this->blob_bottom_label_->data_at
+              (n, c, h, w))) - log(std::max(Dtype(FLT_MIN),
+                     this->blob_top_softmax_->data_at(n, c, h, w))));
         }
       }
     }
   }
   loss /= this->blob_bottom_label_->count(0, 2);
   CHECK_NEAR(loss, this->blob_top_loss_->cpu_data()[0], 1e-5);
+}
+
+TYPED_TEST(SoftmaxEntropyLossLayerTest, TestForwardZero) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layerParameter;
+  layerParameter.mutable_softmax_param()->set_axis(2);
+  SoftmaxLayer<Dtype> layer(layerParameter);
+  layer.SetUp(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
+  layer.Forward(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
+  caffe_copy(this->blob_bottom_label_->count(),
+             this->blob_top_softmax_->cpu_data(),
+             this->blob_bottom_label_->mutable_cpu_data());
+  SoftmaxEntropyLossLayer<Dtype> layer1(layerParameter);
+  layer1.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer1.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  CHECK_NEAR(0, this->blob_top_loss_->cpu_data()[0], 1e-5);
 }
 
 TYPED_TEST(SoftmaxEntropyLossLayerTest, TestGradient) {

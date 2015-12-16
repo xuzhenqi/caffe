@@ -307,6 +307,45 @@ class EuclideanLossLayer : public LossLayer<Dtype> {
 };
 
 /**
+ * @brief Computes the classification accuracy for a one-of-many
+ *        classification task.
+ */
+template <typename Dtype>
+class FaceDetectionAccuracyLayer : public Layer<Dtype> {
+ public:
+  explicit FaceDetectionAccuracyLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "FaceDetectionAccuracy"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const {return 1; }
+
+  // If there are two top blobs, then the second blob will contain
+  // accuracies per class.
+  virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline int MaxTopBlobs() const { return 2; }
+
+  inline Dtype square(Dtype x) {
+    return x * x;
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down,
+                            const vector<Blob<Dtype>*>& bottom) {
+    for (int i = 0; i < propagate_down.size(); ++i) {
+      if (propagate_down[i]) { NOT_IMPLEMENTED; }
+    }
+  }
+};
+
+/**
  * @brief Computes the hinge loss for a one-of-many classification task.
  *
  * @param bottom input Blob vector (length 2)

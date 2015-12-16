@@ -47,8 +47,8 @@ void SoftmaxEntropyLossLayer<Dtype>::Forward_cpu(
     for (int d = 0; d < dim; ++d) {
       DCHECK_GE(label[i*dim + d], 0);
       DCHECK_LE(label[i*dim + d], 1);
-      loss -= label[i*dim + d] * log(std::max(prob_data[i*dim + d], Dtype
-          (FLT_MIN)));
+      loss += label[i*dim + d] * (log(std::max(label[i*dim + d], Dtype
+          (FLT_MIN))) - log(std::max(prob_data[i*dim + d], Dtype(FLT_MIN))));
     }
   }
   top[0]->mutable_cpu_data()[0] = loss / outer_num_;
