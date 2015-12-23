@@ -8,6 +8,7 @@
 
 #include "google/protobuf/message.h"
 
+#include "caffe/blob.hpp"
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/format.hpp"
@@ -19,7 +20,35 @@
 namespace caffe {
 
 using ::google::protobuf::Message;
-using ::boost::filesystem::path;
+using boost::filesystem::path;
+
+template <class Dtype>
+inline void DumpMatrixToTxt(const char* file_name, const int N, const Dtype* vec,
+                            const vector<int>& shape){
+  std::ofstream ofs(file_name);
+  for (int i=0; i<shape.size(); ++i){
+    ofs << shape[i] << " ";
+  }
+  //ofs << std::endl;
+  for (int i=0; i<N; ++i)
+    ofs << vec[i] << " ";
+  ofs << std::endl;
+  ofs.flush();
+}
+
+template <class Dtype>
+inline void DumpMatrixToTxt(const char* file_prefix, const Blob<Dtype>& blob,
+                            bool dump_diff = false) {
+  int N = blob.count();
+  const vector<int> &shape = blob.shape();
+  string filename(file_prefix);
+  filename += string(".data");
+  DumpMatrixToTxt(filename.c_str(), N, blob.cpu_data(), shape);
+  if (dump_diff) {
+    filename = string(file_prefix) + string(".diff");
+    DumpMatrixToTxt(filename.c_str(), N, blob.cpu_diff(), shape);
+  }
+}
 
 inline void MakeTempDir(string* temp_dirname) {
   temp_dirname->clear();

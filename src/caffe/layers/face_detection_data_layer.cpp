@@ -103,6 +103,13 @@ void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& b
     CHECK_EQ(width % scales_[i], 0);
     top[i+2]->Reshape(batch_size, points_, height/scales_[i], width/scales_[i]);
   }
+#ifndef CPU_ONLY
+  if (Caffe::mode() == Caffe::GPU) {
+    sum_multiplier_.Reshape(top[0]->shape());
+    caffe_gpu_set(top[0]->count(), Dtype(1.), sum_multiplier_
+        .mutable_gpu_data());
+  }
+#endif
 }
 
 template <typename Dtype>
@@ -224,6 +231,9 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   for (int i = 0; i < scales_.size(); ++i)
     top[i+2]->Reshape(num, points_, height/scales_[i], width/scales_[i]);
 
+  Timer timer;
+  double gauss_time = 0.0, map_time = 0.0;
+  timer.Start();
   Dtype* label_data = batch->label_.mutable_cpu_data();
   for (int i = 0; i < num; ++i) {
     for (int j = 0; j < points_; ++j) {
@@ -234,7 +244,8 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
                  top[1]->mutable_cpu_data() + top[1]->offset(i, j));
     }
   }
-
+  gauss_time += timer.MicroSeconds();
+  timer.Start();
   const Dtype* big_map;
   Dtype *small_map = NULL;
   for (int s = 0; s < scales_.size(); ++s) {
@@ -253,6 +264,9 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
           scales_[s] * width / scales_[s]);
     }
   }
+  map_time += timer.MicroSeconds();
+  DLOG(INFO) << "Gauss time: " << gauss_time / 1000 << " ms.";
+  DLOG(INFO) << "Map time: " << map_time / 1000 << " ms.";
 
   this->prefetch_free_.push(batch);
 }

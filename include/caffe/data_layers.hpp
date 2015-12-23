@@ -183,6 +183,7 @@ class FaceDetectionDataLayer : public BasePrefetchingDataLayer<Dtype> {
   Dtype std_;
   int points_;
   vector<int> scales_;
+  Blob<Dtype> sum_multiplier_;
 };
 
 /**
