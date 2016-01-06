@@ -44,10 +44,6 @@ void FaceDetectionDataLayer<Dtype>::Forward_gpu(
   caffe_copy(batch->data_.count(), batch->data_.gpu_data(),
              top[0]->mutable_gpu_data());
   DLOG(INFO) << "Prefetch copied";
-  DumpMatrixToTxt("data.txt", top[0]->count(), top[0]->cpu_data(), 
-                  top[0]->shape());
-  DumpMatrixToTxt("label.txt", batch->label_.count(), batch->label_.cpu_data(), 
-                  batch->label_.shape());
 
   // Reshape to loaded labels.
   const int width = top[0]->width(), height = top[0]->height();
@@ -60,8 +56,6 @@ void FaceDetectionDataLayer<Dtype>::Forward_gpu(
   gauss_map_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, label_data, height, width, std_, 
       top[1]->mutable_gpu_data());
-  DumpMatrixToTxt("gauss_map.txt", top[1]->count(), top[1]->cpu_data(), 
-                  top[1]->shape());
   caffe_gpu_gemv<Dtype>(CblasNoTrans, num*points_, height*width, 1., 
                         top[1]->gpu_data(), sum_multiplier_.gpu_data(), 0., 
                         sum_multiplier_.mutable_gpu_diff());
@@ -71,8 +65,6 @@ void FaceDetectionDataLayer<Dtype>::Forward_gpu(
                         top[1]->mutable_gpu_diff());
   caffe_gpu_div<Dtype>(top[1]->count(), top[1]->gpu_data(), top[1]->gpu_diff(),
                        top[1]->mutable_gpu_data());
-  DumpMatrixToTxt("gauss_map_reg.txt", top[1]->count(), top[1]->cpu_data(), 
-                  top[1]->shape());
   int sub_count, sub_height, sub_width;
   for (int s = 0; s < scales_.size(); ++s) {
     sub_count = count / scales_[s] / scales_[s];

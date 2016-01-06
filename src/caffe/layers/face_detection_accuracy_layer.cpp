@@ -24,6 +24,7 @@ void FaceDetectionAccuracyLayer<Dtype>::Forward_cpu(
   const int height = bottom[1]->height();
   const int width = bottom[1]->width();
   vector<int> index_data(channel*2, 0), index_label(channel*2, 0);
+  Dtype eye_wl, eye_hl, eye_wr, eye_hr;
   Dtype max_data, max_label, eye_dis;
   for (int n = 0; n < num; ++n) {
     for (int c = 0; c < channel; ++c) {
@@ -50,14 +51,23 @@ void FaceDetectionAccuracyLayer<Dtype>::Forward_cpu(
         }
       }
     }
-    eye_dis = sqrt(square(index_label[2*36]-index_label[2*45]) + square
-        (index_label[2*36+1]-index_label[2*45+1]));
+    eye_hl = 0; eye_hr = 0; eye_wl = 0; eye_wr = 0;
+    for (int c = 36; c < 42; ++c) {
+      eye_wl += index_label[2*c];
+      eye_hl += index_label[2*c + 1];
+    }
+    for (int c = 42; c < 48; ++c) {
+      eye_wr += index_label[2*c];
+      eye_hr += index_label[2*c + 1];
+    }
+    eye_hl /= 6; eye_hr /= 6; eye_wl /= 6; eye_wr /= 6;
+    eye_dis = sqrt(square(eye_hl - eye_hr) + square(eye_wl - eye_wr));
     for (int c = 0; c < channel; ++c) {
       err += sqrt(square(index_data[2*c]-index_label[2*c]) + square
           (index_data[2*c+1]-index_label[2*c+1])) / eye_dis;
     }
   }
-  top[0]->mutable_cpu_data()[0] = err / num;
+  top[0]->mutable_cpu_data()[0] = err / num / channel * 100;
 }
 
 INSTANTIATE_CLASS(FaceDetectionAccuracyLayer);
