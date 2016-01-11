@@ -18,16 +18,16 @@ using boost::scoped_ptr;
 
 namespace caffe {
 
-template <typename TypeParam>
-class SoftmaxEntropyLossLayerTest : public MultiDeviceTest<TypeParam> {
+template<typename TypeParam>
+class SoftmaxEntropyLossLayerTest: public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;
 
  protected:
   SoftmaxEntropyLossLayerTest()
-    : blob_bottom_data_(new Blob<Dtype>()),
-      blob_bottom_label_(new Blob<Dtype>()),
-      blob_top_softmax_(new Blob<Dtype>()),
-      blob_top_loss_(new Blob<Dtype>()) {
+      : blob_bottom_data_(new Blob<Dtype>()),
+        blob_bottom_label_(new Blob<Dtype>()),
+        blob_top_softmax_(new Blob<Dtype>()),
+        blob_top_loss_(new Blob<Dtype>()) {
     vector<int> shape;
     shape.push_back(4);
     shape.push_back(3);
@@ -48,12 +48,12 @@ class SoftmaxEntropyLossLayerTest : public MultiDeviceTest<TypeParam> {
       for (int c = 0; c < blob_bottom_label_->channels(); ++c) {
         sum = 0;
         for (int h = 0; h < blob_bottom_label_->height(); ++h) {
-            sum += blob_bottom_label_->cpu_data()[
-                blob_bottom_label_->offset(n, c, h)];
+          sum += blob_bottom_label_->cpu_data()[
+              blob_bottom_label_->offset(n, c, h)];
         }
         for (int h = 0; h < blob_bottom_label_->height(); ++h) {
-            blob_bottom_label_->mutable_cpu_data()[
-                blob_bottom_label_->offset(n, c, h)] /= sum;
+          blob_bottom_label_->mutable_cpu_data()[
+              blob_bottom_label_->offset(n, c, h)] /= sum;
         }
       }
     }
@@ -68,16 +68,17 @@ class SoftmaxEntropyLossLayerTest : public MultiDeviceTest<TypeParam> {
     delete blob_bottom_data_;
     delete blob_bottom_label_;
     delete blob_top_loss_;
+    delete blob_top_softmax_;
   }
 
   Blob<Dtype> *const blob_bottom_data_;
   Blob<Dtype> *const blob_bottom_label_;
   Blob<Dtype> *const blob_top_loss_;
   Blob<Dtype> *const blob_top_softmax_;
-  vector<Blob<Dtype>*> blob_bottom_vec_;
-  vector<Blob<Dtype>*> blob_top_vec_;
-  vector<Blob<Dtype>*> blob_bottom_softmax_vec_;
-  vector<Blob<Dtype>*> blob_top_softmax_vec_;
+  vector<Blob<Dtype> *> blob_bottom_vec_;
+  vector<Blob<Dtype> *> blob_top_vec_;
+  vector<Blob<Dtype> *> blob_bottom_softmax_vec_;
+  vector<Blob<Dtype> *> blob_top_softmax_vec_;
 };
 
 TYPED_TEST_CASE(SoftmaxEntropyLossLayerTest, TestDtypesAndDevices);
@@ -99,8 +100,8 @@ TYPED_TEST(SoftmaxEntropyLossLayerTest, TestForward) {
         for (int w = 0; w < this->blob_bottom_label_->width(); ++w) {
           loss += this->blob_bottom_label_->data_at(n, c, h, w) *
               (log(std::max(Dtype(FLT_MIN), this->blob_bottom_label_->data_at
-              (n, c, h, w))) - log(std::max(Dtype(FLT_MIN),
-                     this->blob_top_softmax_->data_at(n, c, h, w))));
+                  (n, c, h, w))) - log(std::max(Dtype(FLT_MIN),
+                  this->blob_top_softmax_->data_at(n, c, h, w))));
         }
       }
     }
@@ -113,6 +114,7 @@ TYPED_TEST(SoftmaxEntropyLossLayerTest, TestForwardZero) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layerParameter;
   layerParameter.mutable_softmax_param()->set_axis(2);
+  // Todo: Remove the following three lines
   SoftmaxLayer<Dtype> layer(layerParameter);
   layer.SetUp(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
   layer.Forward(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
