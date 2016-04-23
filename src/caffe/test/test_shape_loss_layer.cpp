@@ -152,9 +152,83 @@ TYPED_TEST(ShapeLossLayerTest, TestForwardZero) {
   CHECK_NEAR(0, this->blob_top_loss_->cpu_data()[0], 1e-5);
 }
 
+TYPED_TEST(ShapeLossLayerTest, TestForwardScale) {
+  typedef typename TypeParam::Dtype Dtype;
+
+  Dtype scale = 4;
+  FillerParameter fillerParameter;
+  fillerParameter.set_min(0.);
+  fillerParameter.set_max(5*scale);
+  UniformFiller<Dtype> filler(fillerParameter);
+  filler.Fill(this->blob_bottom_label_);
+
+  LayerParameter layerParameter;
+  layerParameter.mutable_shape_loss_param()->set_scale(scale);
+  layerParameter.mutable_softmax_param()->set_axis(2);
+  ShapeLossLayer<Dtype> layer(layerParameter);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  SoftmaxLayer<Dtype> layer1(layerParameter);
+  vector<int> shape;
+  shape.push_back(4);
+  shape.push_back(3);
+  shape.push_back(25);
+  this->blob_bottom_data_->Reshape(shape);
+  layer1.SetUp(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
+  layer1.Forward(this->blob_bottom_softmax_vec_, this->blob_top_softmax_vec_);
+  this->blob_top_softmax_->Reshape(4, 3, 5, 5);
+  shape.clear();
+  shape.push_back(4);
+  shape.push_back(3);
+  Blob<Dtype> mean_shape(shape); // data for row, diff for col
+  Dtype *row_shape = mean_shape.mutable_cpu_data();
+  Dtype *col_shape = mean_shape.mutable_cpu_diff();
+  const Dtype *label = this->blob_bottom_label_->cpu_data();
+  int channels = this->blob_bottom_data_->channels();
+  Dtype loss = 0;
+  for (int n = 0; n < this->blob_bottom_data_->num(); ++n) {
+    for(int i = 0; i < channels; ++i) {
+      row_shape[n*channels+i] = 0;
+      col_shape[n*channels+i] = 0;
+      for(int j = 0; j < 5; ++j) {
+        for(int k = 0; k < 5; ++k) {
+          row_shape[n*channels+i] +=
+              j * this->blob_top_softmax_->data_at(n, i, j, k);
+          col_shape[n*channels+i] +=
+              k * this->blob_top_softmax_->data_at(n, i, j, k);
+        }
+      }
+      loss += (label[2*(n*channels + i)] / scale - col_shape[n*channels + i]) *
+          (label[2*(n*channels + i)] / scale - col_shape[n*channels + i]) +
+          (label[2*(n*channels + i)+1] / scale - row_shape[n*channels + i]) *
+              (label[2*(n*channels+i)+1] / scale - row_shape[n*channels+i]);
+    }
+  }
+  CHECK_NEAR(this->blob_top_loss_->cpu_data()[0], loss / 4 / 3, 1e-5);
+}
+
 TYPED_TEST(ShapeLossLayerTest, TestGradient){
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layerParameter;
+  layerParameter.mutable_softmax_param()->set_axis(2);
+  ShapeLossLayer<Dtype> layer(layerParameter);
+  GradientChecker<Dtype> checker(1e-2, 1e-2);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+                                  this->blob_top_vec_, 0);
+}
+
+TYPED_TEST(ShapeLossLayerTest, TestGradientScale){
+  typedef typename TypeParam::Dtype Dtype;
+
+  Dtype scale = 4;
+  FillerParameter fillerParameter;
+  fillerParameter.set_min(0.);
+  fillerParameter.set_max(5*scale);
+  UniformFiller<Dtype> filler(fillerParameter);
+  filler.Fill(this->blob_bottom_label_);
+
+  LayerParameter layerParameter;
+  layerParameter.mutable_shape_loss_param()->set_scale(scale);
   layerParameter.mutable_softmax_param()->set_axis(2);
   ShapeLossLayer<Dtype> layer(layerParameter);
   GradientChecker<Dtype> checker(1e-2, 1e-2);

@@ -908,6 +908,7 @@ class ShapeLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> mean_shape_; // data for row, diff for col
   Blob<Dtype> multiplier_; // data for row, diff for col
   int softmax_axis_, outer_num_, height_, width_;
+  Dtype scale_;
 };
 
 }  // namespace caffe

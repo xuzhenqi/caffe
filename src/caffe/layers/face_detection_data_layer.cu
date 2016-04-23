@@ -40,31 +40,34 @@ void FaceDetectionDataLayer<Dtype>::Forward_gpu(
                                                   "empty");
   // Reshape to loaded data.
   top[0]->ReshapeLike(batch->data_);
+  top[1]->ReshapeLike(batch->label_);
   // Copy the data
   caffe_copy(batch->data_.count(), batch->data_.gpu_data(),
              top[0]->mutable_gpu_data());
+  caffe_copy(batch->label_.count(), batch->label_.gpu_data(),
+             top[1]->mutable_gpu_data());
   DLOG(INFO) << "Prefetch copied";
 
   // Reshape to loaded labels.
   const int width = top[0]->width(), height = top[0]->height();
-  const int num = top[0]->num(), count = top[1]->count();
-  top[1]->Reshape(num, points_, height, width);
+  const int num = top[0]->num(), count = top[2]->count();
+  top[2]->Reshape(num, points_, height, width);
   for (int i = 0; i < scales_.size(); ++i)
-    top[i+2]->Reshape(num, points_, height/scales_[i], width/scales_[i]);
+    top[i+3]->Reshape(num, points_, height/scales_[i], width/scales_[i]);
 
   const Dtype* label_data = batch->label_.gpu_data();
   gauss_map_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, label_data, height, width, std_, 
-      top[1]->mutable_gpu_data());
+      top[2]->mutable_gpu_data());
   caffe_gpu_gemv<Dtype>(CblasNoTrans, num*points_, height*width, 1., 
-                        top[1]->gpu_data(), sum_multiplier_.gpu_data(), 0., 
+                        top[2]->gpu_data(), sum_multiplier_.gpu_data(), 0., 
                         sum_multiplier_.mutable_gpu_diff());
   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num*points_, height*width, 
                         1., 1., sum_multiplier_.gpu_diff(), 
                         sum_multiplier_.gpu_data(), 0., 
-                        top[1]->mutable_gpu_diff());
-  caffe_gpu_div<Dtype>(top[1]->count(), top[1]->gpu_data(), top[1]->gpu_diff(),
-                       top[1]->mutable_gpu_data());
+                        top[2]->mutable_gpu_diff());
+  caffe_gpu_div<Dtype>(top[2]->count(), top[2]->gpu_data(), top[2]->gpu_diff(),
+                       top[2]->mutable_gpu_data());
   int sub_count, sub_height, sub_width;
   for (int s = 0; s < scales_.size(); ++s) {
     sub_count = count / scales_[s] / scales_[s];
@@ -72,18 +75,18 @@ void FaceDetectionDataLayer<Dtype>::Forward_gpu(
     sub_width = width / scales_[s];
     down_sample_kernel<Dtype><<<CAFFE_GET_BLOCKS(sub_count), 
         CAFFE_CUDA_NUM_THREADS>>>(sub_count, scales_[s], 
-         sub_height, sub_width, top[1]->gpu_data(),
-         top[2+s]->mutable_gpu_data());
+         sub_height, sub_width, top[2]->gpu_data(),
+         top[3+s]->mutable_gpu_data());
     caffe_gpu_gemv<Dtype>(CblasNoTrans, num*points_, sub_height*sub_width, 1., 
-                          top[2+s]->gpu_data(), sum_multiplier_.gpu_data(), 0., 
+                          top[3+s]->gpu_data(), sum_multiplier_.gpu_data(), 0., 
                           sum_multiplier_.mutable_gpu_diff());
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num*points_, 
                           sub_height*sub_width, 1., 1., 
                           sum_multiplier_.gpu_diff(), 
                           sum_multiplier_.gpu_data(), 0., 
-                          top[2+s]->mutable_gpu_diff());
-    caffe_gpu_div<Dtype>(sub_count, top[2+s]->gpu_data(), top[2+s]->gpu_diff(),
-                         top[2+s]->mutable_gpu_data());
+                          top[3+s]->mutable_gpu_diff());
+    caffe_gpu_div<Dtype>(sub_count, top[3+s]->gpu_data(), top[3+s]->gpu_diff(),
+                         top[3+s]->mutable_gpu_data());
   }
   // Ensure the copy is synchronous wrt the host, so that the next batch isn't
   // copied in meanwhile.

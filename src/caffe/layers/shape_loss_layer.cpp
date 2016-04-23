@@ -39,6 +39,7 @@ void ShapeLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype> *> &bottom,
       *(row++) = i;
     }
   }
+  scale_ = this->layer_param_.shape_loss_param().scale();
 }
 
 template <typename Dtype>
@@ -74,8 +75,8 @@ void ShapeLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype> *> &bottom,
                  Dtype(0.), mean_col);
   Dtype loss = 0;
   for (int i = 0; i < outer_num_; ++i) {
-    loss += square(*(label++) - *(mean_col++)) + square(*(label++) -
-        *(mean_row++));
+    loss += square(*(label++) / scale_ - *(mean_col++)) + square(*(label++) /
+        scale_ - *(mean_row++));
   }
   top[0]->mutable_cpu_data()[0] = loss / outer_num_;
 }
@@ -96,8 +97,8 @@ void ShapeLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype> *> &top,
   Dtype loss_weight = top[0]->cpu_diff()[0] / outer_num_ * 2;
   Dtype gap_row, gap_col, gap_j;
   for(int i = 0; i < outer_num_; ++i) {
-    gap_row = (*mean_row - *(label + 1));
-    gap_col = (*mean_col - *label);
+    gap_row = (*mean_row - *(label + 1) / scale_);
+    gap_col = (*mean_col - *label / scale_);
     for(int j = 0; j < height_; ++j) {
       gap_j = j - *mean_row;
       for (int k = 0; k < width_; ++k) {

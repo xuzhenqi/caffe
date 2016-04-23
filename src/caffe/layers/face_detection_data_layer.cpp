@@ -91,17 +91,18 @@ void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& b
   vector<int> label_shape(2, 0);
   label_shape[0] = batch_size;
   label_shape[1] = 2 * points_;
+  top[1]->Reshape(label_shape);
   for (int i = 0; i < this->PREFETCH_COUNT; ++i) {
     this->prefetch_[i].label_.Reshape(label_shape);
   }
   int height = top_shape[2], width = top_shape[3];
 
-  top[1]->Reshape(batch_size, points_, height, width);
-  CHECK_EQ(scales_.size(), top.size() - 2);
+  top[2]->Reshape(batch_size, points_, height, width);
+  CHECK_EQ(scales_.size(), top.size() - 3);
   for (int i = 0; i < scales_.size(); ++i) {
     CHECK_EQ(height % scales_[i], 0);
     CHECK_EQ(width % scales_[i], 0);
-    top[i+2]->Reshape(batch_size, points_, height/scales_[i], width/scales_[i]);
+    top[i+3]->Reshape(batch_size, points_, height/scales_[i], width/scales_[i]);
   }
 #ifndef CPU_ONLY
   if (Caffe::mode() == Caffe::GPU) {
@@ -219,17 +220,20 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
                                                   "empty");
   // Reshape to loaded data.
   top[0]->ReshapeLike(batch->data_);
+  top[1]->ReshapeLike(batch->label_);
   // Copy the data
   caffe_copy(batch->data_.count(), batch->data_.cpu_data(),
              top[0]->mutable_cpu_data());
+  caffe_copy(batch->label_.count(), batch->label_.cpu_data(),
+            top[1]->mutable_cpu_data());
   DLOG(INFO) << "Prefetch copied";
 
   // Reshape to loaded labels.
   const int width = top[0]->width(), height = top[0]->height();
   const int num = top[0]->num();
-  top[1]->Reshape(num, points_, height, width);
+  top[2]->Reshape(num, points_, height, width);
   for (int i = 0; i < scales_.size(); ++i)
-    top[i+2]->Reshape(num, points_, height/scales_[i], width/scales_[i]);
+    top[i+3]->Reshape(num, points_, height/scales_[i], width/scales_[i]);
 
   Timer timer;
   double gauss_time = 0.0, map_time = 0.0;
@@ -239,9 +243,9 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
     for (int j = 0; j < points_; ++j) {
       gauss_map(label_data[i*2*points_+2*j], label_data[i*2*points_+2*j+1],
                 height, width,
-                top[1]->mutable_cpu_data() + top[1]->offset(i, j));
+                top[2]->mutable_cpu_data() + top[2]->offset(i, j));
       regularize(height * width,
-                 top[1]->mutable_cpu_data() + top[1]->offset(i, j));
+                 top[2]->mutable_cpu_data() + top[2]->offset(i, j));
     }
   }
   gauss_time += timer.MicroSeconds();
@@ -249,8 +253,8 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   const Dtype* big_map;
   Dtype *small_map = NULL;
   for (int s = 0; s < scales_.size(); ++s) {
-    big_map = top[1]->cpu_data();
-    small_map = top[s+2]->mutable_cpu_data();
+    big_map = top[2]->cpu_data();
+    small_map = top[s+3]->mutable_cpu_data();
     for (int i = 0; i < num * points_; ++i) {
       for (int h = 0; h < height / scales_[s]; ++h) {
         for (int w = 0; w < width / scales_[s]; ++w) {

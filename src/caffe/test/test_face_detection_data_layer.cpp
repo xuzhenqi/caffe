@@ -20,10 +20,10 @@ class FaceDetectionDataLayerTest : public MultiDeviceTest<TypeParam> {
       points_(5),
       filename_(EXAMPLES_SOURCE_DIR "images/eye_loc_temp.txt"){
     Caffe::set_random_seed(1701);
-    for (int i = 0; i < 5; ++i){
+    for (int i = 0; i < 6; ++i){
       blob_top_vec_.push_back(new Blob<Dtype>);
     }
-    for (int i = 0; i < 2; ++i){
+    for (int i = 0; i < 3; ++i){
       blob_top_vec_no_scale_.push_back(new Blob<Dtype>);
     }
     std::ifstream source(filename_.c_str());
@@ -81,9 +81,12 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardGaussMap) {
   EXPECT_EQ(this->blob_top_vec_no_scale_[0]->width(), 128);
 
   EXPECT_EQ(this->blob_top_vec_no_scale_[1]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_no_scale_[1]->channels(), this->points_);
-  EXPECT_EQ(this->blob_top_vec_no_scale_[1]->height(), 128);
-  EXPECT_EQ(this->blob_top_vec_no_scale_[1]->width(), 128);
+  EXPECT_EQ(this->blob_top_vec_no_scale_[1]->channels(), this->points_ * 2);
+
+  EXPECT_EQ(this->blob_top_vec_no_scale_[2]->num(), 2);
+  EXPECT_EQ(this->blob_top_vec_no_scale_[2]->channels(), this->points_);
+  EXPECT_EQ(this->blob_top_vec_no_scale_[2]->height(), 128);
+  EXPECT_EQ(this->blob_top_vec_no_scale_[2]->width(), 128);
 
   layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_no_scale_);
 
@@ -96,8 +99,8 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardGaussMap) {
       peak = 0;
       for (int h = 0; h < 128; ++h) {
         for (int w = 0; w < 128; ++w) {
-          if (peak < this->blob_top_vec_no_scale_[1]->data_at(n, c, h, w)) {
-            peak = this->blob_top_vec_no_scale_[1]->data_at(n, c, h, w);
+          if (peak < this->blob_top_vec_no_scale_[2]->data_at(n, c, h, w)) {
+            peak = this->blob_top_vec_no_scale_[2]->data_at(n, c, h, w);
             loc_width = w;
             loc_height = h;
           }
@@ -106,6 +109,12 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardGaussMap) {
       std::cout << loc_width << " " << loc_height << endl;
       CHECK_EQ(this->labels_[n][2*c], loc_width);
       CHECK_EQ(this->labels_[n][2*c + 1], loc_height);
+      CHECK_NEAR(this->labels_[n][2*c],
+                 this->blob_top_vec_no_scale_[1]->cpu_data()
+                 [2*(n*this->points_+c)], 1e-5);
+      CHECK_NEAR(this->labels_[n][2*c+1],
+                 this->blob_top_vec_no_scale_[1]->cpu_data()
+                 [2*(n*this->points_+c)+1], 1e-5);
     }
   }
 
@@ -114,8 +123,8 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardGaussMap) {
   for (int n = 0; n< 2; ++n) {
     for (int c = 0; c < this->points_; ++c) {
       sum = 0;
-      data = this->blob_top_vec_no_scale_[1]->cpu_data() +
-          this->blob_top_vec_no_scale_[1]->offset(n, c);
+      data = this->blob_top_vec_no_scale_[2]->cpu_data() +
+          this->blob_top_vec_no_scale_[2]->offset(n, c);
       for (int i = 0; i < 128 * 128; ++i)
         sum += data[i];
       CHECK_NEAR(1, sum, 1e-5);
@@ -150,24 +159,27 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardScale) {
   EXPECT_EQ(this->blob_top_vec_[0]->width(), 128);
 
   EXPECT_EQ(this->blob_top_vec_[1]->num(), 2);
-  EXPECT_EQ(this->blob_top_vec_[1]->channels(), this->points_);
-  EXPECT_EQ(this->blob_top_vec_[1]->height(), 128);
-  EXPECT_EQ(this->blob_top_vec_[1]->width(), 128);
+  EXPECT_EQ(this->blob_top_vec_[1]->channels(), this->points_ * 2);
 
   EXPECT_EQ(this->blob_top_vec_[2]->num(), 2);
   EXPECT_EQ(this->blob_top_vec_[2]->channels(), this->points_);
-  EXPECT_EQ(this->blob_top_vec_[2]->height(), 32);
-  EXPECT_EQ(this->blob_top_vec_[2]->width(), 32);
+  EXPECT_EQ(this->blob_top_vec_[2]->height(), 128);
+  EXPECT_EQ(this->blob_top_vec_[2]->width(), 128);
 
   EXPECT_EQ(this->blob_top_vec_[3]->num(), 2);
   EXPECT_EQ(this->blob_top_vec_[3]->channels(), this->points_);
-  EXPECT_EQ(this->blob_top_vec_[3]->height(), 16);
-  EXPECT_EQ(this->blob_top_vec_[3]->width(), 16);
+  EXPECT_EQ(this->blob_top_vec_[3]->height(), 32);
+  EXPECT_EQ(this->blob_top_vec_[3]->width(), 32);
 
   EXPECT_EQ(this->blob_top_vec_[4]->num(), 2);
   EXPECT_EQ(this->blob_top_vec_[4]->channels(), this->points_);
-  EXPECT_EQ(this->blob_top_vec_[4]->height(), 8);
-  EXPECT_EQ(this->blob_top_vec_[4]->width(), 8);
+  EXPECT_EQ(this->blob_top_vec_[4]->height(), 16);
+  EXPECT_EQ(this->blob_top_vec_[4]->width(), 16);
+
+  EXPECT_EQ(this->blob_top_vec_[5]->num(), 2);
+  EXPECT_EQ(this->blob_top_vec_[5]->channels(), this->points_);
+  EXPECT_EQ(this->blob_top_vec_[5]->height(), 8);
+  EXPECT_EQ(this->blob_top_vec_[5]->width(), 8);
 
   layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
 
@@ -180,8 +192,8 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardScale) {
       peak = 0;
       for (int h = 0; h < 128; ++h) {
         for (int w = 0; w < 128; ++w) {
-          if (peak < this->blob_top_vec_[1]->data_at(n, c, h, w)) {
-            peak = this->blob_top_vec_[1]->data_at(n, c, h, w);
+          if (peak < this->blob_top_vec_[2]->data_at(n, c, h, w)) {
+            peak = this->blob_top_vec_[2]->data_at(n, c, h, w);
             loc_width = w;
             loc_height = h;
           }
@@ -190,6 +202,12 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardScale) {
       std::cout << loc_width << " " << loc_height << endl;
       CHECK_EQ(this->labels_[n][2*c], loc_width);
       CHECK_EQ(this->labels_[n][2*c + 1], loc_height);
+      CHECK_NEAR(this->labels_[n][2*c],
+                 this->blob_top_vec_[1]->cpu_data()
+                 [2*(n*this->points_+c)], 1e-5);
+      CHECK_NEAR(this->labels_[n][2*c+1],
+                 this->blob_top_vec_[1]->cpu_data()
+                 [2*(n*this->points_+c)+1], 1e-5);
     }
   }
 
@@ -198,29 +216,29 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardScale) {
   for (int n = 0; n< 2; ++n) {
     for (int c = 0; c < this->points_; ++c) {
       sum = 0;
-      data = this->blob_top_vec_[1]->cpu_data() +
-          this->blob_top_vec_[1]->offset(n,c);
-      for (int i = 0; i < 128*128; ++i)
-        sum += data[i];
-      CHECK_NEAR(1, sum, 1e-5);
-
-      sum = 0;
       data = this->blob_top_vec_[2]->cpu_data() +
           this->blob_top_vec_[2]->offset(n,c);
-      for (int i = 0; i < 32*32; ++i)
+      for (int i = 0; i < 128*128; ++i)
         sum += data[i];
       CHECK_NEAR(1, sum, 1e-5);
 
       sum = 0;
       data = this->blob_top_vec_[3]->cpu_data() +
           this->blob_top_vec_[3]->offset(n,c);
-      for (int i = 0; i < 16*16; ++i)
+      for (int i = 0; i < 32*32; ++i)
         sum += data[i];
       CHECK_NEAR(1, sum, 1e-5);
 
       sum = 0;
       data = this->blob_top_vec_[4]->cpu_data() +
           this->blob_top_vec_[4]->offset(n,c);
+      for (int i = 0; i < 16*16; ++i)
+        sum += data[i];
+      CHECK_NEAR(1, sum, 1e-5);
+
+      sum = 0;
+      data = this->blob_top_vec_[5]->cpu_data() +
+          this->blob_top_vec_[5]->offset(n,c);
       for (int i = 0; i < 8*8; ++i)
         sum += data[i];
       CHECK_NEAR(1, sum, 1e-5);

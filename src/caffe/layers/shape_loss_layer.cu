@@ -21,13 +21,14 @@ void ShapeLossLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype> *> &bottom,
                                         const vector<Blob<Dtype> *> &top) {
   softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
   const Dtype* prob_data = prob_.gpu_data();
-  const Dtype* label = bottom[1]->gpu_data();
+  Dtype* label = bottom[1]->mutable_gpu_data();
   const Dtype* row = multiplier_.gpu_data();
   const Dtype* col = multiplier_.gpu_diff();
   Dtype* mean_row = mean_shape_.mutable_gpu_data();
   Dtype* mean_col = mean_shape_.mutable_gpu_diff();
   Dtype* temp = bottom[1]->mutable_gpu_diff();
   int dim = prob_.count() / outer_num_;
+  caffe_gpu_scal(bottom[1]->count(), Dtype(1.)/scale_, label);
   caffe_gpu_gemv(CblasNoTrans, outer_num_, dim, Dtype(1.), prob_data, row,
                  Dtype(0.), mean_row);
   caffe_gpu_gemv(CblasNoTrans, outer_num_, dim, Dtype(1.), prob_data, col,
@@ -37,6 +38,7 @@ void ShapeLossLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype> *> &bottom,
   caffe_gpu_sub(2*outer_num_, temp, label, temp);
   caffe_gpu_dot(2*outer_num_, temp, temp, top[0]->mutable_cpu_data());
   top[0]->mutable_cpu_data()[0] /= outer_num_;
+  caffe_gpu_scal(bottom[1]->count(), scale_, label); // Rescale
 }
 
 template <typename Dtype>
