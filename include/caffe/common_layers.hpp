@@ -844,6 +844,46 @@ class TileLayer : public Layer<Dtype> {
   unsigned int axis_, tiles_, outer_dim_, inner_dim_;
 };
 
+/**
+ * @brief Copy a Blob along specified dimensions.
+ */
+template <typename Dtype>
+class SumNormLayer : public Layer<Dtype> {
+ public:
+  explicit SumNormLayer(const LayerParameter& param)
+      : Layer<Dtype>(param), min_channels_(0) {}
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "SumNorm"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+  inline int min_channels() {return min_channels_; } // for test
+  bool ParseRanges(string str, vector<int>& ranges);
+
+ protected:
+
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down,
+                            const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down,
+                            const vector<Blob<Dtype>*>& bottom);
+
+  vector<vector<int> > ranges_;
+  int min_channels_;
+  bool prob_;
+};
+
+
 }  // namespace caffe
 
 #endif  // CAFFE_COMMON_LAYERS_HPP_
