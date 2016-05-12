@@ -1,5 +1,6 @@
 #ifdef USE_OPENCV
 #include <opencv2/core/core.hpp>
+#endif  // USE_OPENCV
 
 #include <fstream>  // NOLINT(readability/streams)
 #include <iostream>  // NOLINT(readability/streams)
@@ -279,4 +280,3 @@ INSTANTIATE_CLASS(FaceDetectionDataLayer);
 REGISTER_LAYER_CLASS(FaceDetectionData);
 
 }  // namespace caffe
-#endif  // USE_OPENCV
