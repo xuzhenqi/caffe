@@ -276,6 +276,10 @@ void FaceDetectionDataLayer<Dtype>::Forward_cpu(
   this->prefetch_free_.push(batch);
 }
 
+#ifdef CPU_ONLY
+STUB_GPU_FORWARD(FaceDetectionDataLayer, Forward);
+#endif
+
 INSTANTIATE_CLASS(FaceDetectionDataLayer);
 REGISTER_LAYER_CLASS(FaceDetectionData);
 
