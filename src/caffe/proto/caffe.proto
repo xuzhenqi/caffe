@@ -308,8 +308,8 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 144 (last added:
-// kl_divergence_loss_param).
+// LayerParameter next available layer-specific ID: 145 (last added:
+// bn_param).
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -359,6 +359,7 @@ message LayerParameter {
   optional AccuracyParameter accuracy_param = 102;
   optional ArgMaxParameter argmax_param = 103;
   optional BatchNormParameter batch_norm_param = 139;
+  optional BNParameter bn_param = 144;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -1282,4 +1283,15 @@ message SumNormParameter {
   // indexes begins from 0.
   repeated string channels = 1;
   optional bool prob = 2 [default = true];
+}
+
+message BNParameter {
+  optional FillerParameter scale_filler = 1; // The initial filler for the scale
+  optional FillerParameter shift_filler = 2; // The initial filler for the shift
+  optional float var_eps = 3 [default = 1e-10]; // The epsilon added to variance
+  // whether or not using moving average for inference
+  optional bool moving_average = 4 [default = false];
+  // The decay factor for moving average
+  optional float decay = 5 [default = 0.05];
+  optional int32 axis = 6 [default = 1];
 }
