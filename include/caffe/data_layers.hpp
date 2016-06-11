@@ -4,6 +4,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <thread>
+#include <mutex>
 #include "hdf5.h"
 
 #include "caffe/blob.hpp"
@@ -16,6 +18,8 @@
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/blocking_queue.hpp"
 #include "caffe/util/db.hpp"
+#include "caffe/util/semaphore.hpp"
+#include "caffe/aug_data_transformer.hpp"
 
 #define HDF5_DATA_DATASET_NAME "data"
 #define HDF5_DATA_LABEL_NAME "label"
@@ -381,6 +385,92 @@ class WindowDataLayer : public BasePrefetchingDataLayer<Dtype> {
   bool has_mean_values_;
   bool cache_images_;
   vector<std::pair<std::string, Datum > > image_database_cache_;
+};
+
+template <typename Dtype>
+struct PrefetchThreadInfo {
+ public:
+  vector<size_t> list_;
+  Semaphore start_;
+  Semaphore end_;
+  Blob<Dtype> data_;
+  Blob<Dtype> label_;
+  std::vector<shared_ptr<Blob<Dtype>>> transformed_data_v;
+  std::vector<shared_ptr<Blob<Dtype>>> transformed_label_v;
+  shared_ptr<std::thread> thread_;
+};
+
+template <typename Dtype>
+class ExImageDataLayer : public BaseDataLayer<Dtype> {
+ public:
+  explicit ExImageDataLayer(const LayerParameter& param)
+      : BaseDataLayer<Dtype>(param) {}
+  virtual ~ExImageDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                              const vector<Blob<Dtype>*>& top);
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ExImageData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 2; }
+
+ protected:
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+  void InternalThreadEntry(int index);
+  void CreatePrefetchThread();
+  void JoinPrefetchThread();
+  void GetFetchList(vector<size_t> &list);
+  void ShuffleImages();
+  void LoadData(const std::vector<std::string>& item, ExImageDataParameter_DataType data_type, int data_num, cv::Mat& loaded_data);
+  static void MatToBlob(const cv::Mat& mat, Blob<Dtype>& blob, ExImageDataParameter_DataType data_type);
+  static void MergeBlob(const std::vector<shared_ptr<Blob<Dtype>>>& blobs, Blob<Dtype>& merged_blob);
+  void ReadImageWithCache(const string& file_name, int new_height, int new_width, int new_max_size, bool is_color, cv::Mat& image);
+  void ReadImageWithoutCache(const string& file_name, int new_height, int new_width, int new_max_size, bool is_color, cv::Mat& image);
+
+  // data source
+  bool binary_source;
+  std::vector<std::string> source;
+  std::vector<std::string> root_folder;
+
+  // data list
+  std::vector<std::pair<std::vector<std::string>, std::vector<std::string> > > lines_;
+  std::vector<size_t> lines_index;
+  int lines_id_;
+  size_t total_image_num;
+
+  // parameter
+  int batch_size;
+  bool need_shuffle;
+  int new_height;
+  int new_width;
+  int new_max_size;
+  bool is_color;
+  ExImageDataParameter_DataType data_type;
+  int data_num;
+  ExImageDataParameter_DataType label_type;
+  int label_num;
+
+  // image cache
+  unsigned long long cache_in_byte;
+  unsigned long long used_cache_in_byte;
+  std::map<std::string, std::vector<unsigned char> > cached_data_map_encoded;
+  std::map<std::string, cv::Mat> cached_data_map_decoded;
+  std::mutex mutex_cache_map;
+  bool cache_finished;
+
+  // transformer
+  LayerParameter_TransformType transform_type_;
+  shared_ptr<AugDataTransformer<Dtype> > aug_data_transformer_;
+
+  // multi-thread prefetch
+  int prefetch_thread_num;
+  int next_prefetch_thread_;
+  vector<shared_ptr<PrefetchThreadInfo<Dtype>>> prefetch_thread_v_;
 };
 
 }  // namespace caffe

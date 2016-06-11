@@ -308,8 +308,8 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 145 (last added:
-// bn_param).
+// LayerParameter next available layer-specific ID: 146 (last added:
+// ex_image_data_param).
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -347,6 +347,15 @@ message LayerParameter {
   // Parameters for data pre-processing.
   optional TransformationParameter transform_param = 100;
 
+  // For ExImageDataParaemter
+  enum TransformType {
+  	NATIVE = 0;
+    AUGMENT = 1;
+    NONE = 2;
+  }
+  optional TransformType transform_type = 202 [default = NATIVE];
+  optional AugTransformationParameter aug_transform_param = 201;
+
   // Parameters shared by loss layers.
   optional LossParameter loss_param = 101;
 
@@ -368,6 +377,7 @@ message LayerParameter {
   optional DummyDataParameter dummy_data_param = 109;
   optional EltwiseParameter eltwise_param = 110;
   optional EmbedParameter embed_param = 137;
+  optional ExImageDataParameter ex_image_data_param = 145;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
   optional GaussMapParameter gaussmap_param = 140;
@@ -1294,4 +1304,119 @@ message BNParameter {
   // The decay factor for moving average
   optional float decay = 5 [default = 0.05];
   optional int32 axis = 6 [default = 1];
+}
+
+message ExImageDataParameter {
+    // ------------------------------  common  -----------------------------
+    repeated string source = 1;
+    // If use binary_source, the source will be read as a binary file with format:
+    // [num] [list elements], while string is stored as [string's length (64bit) ] + [string]
+    // By this way the list will be read even more faster.
+    optional bool binary_source = 2 [default = false];
+    optional uint32 batch_size = 3 [default = 1];
+    optional bool shuffle = 4 [default = false];
+
+    // ------------------------  data specification  -----------------------
+    enum DataType {
+        IMAGE = 0;
+        FLOAT = 1;
+    }
+    // specify data type for data and label
+    // IMAGE: some path to an image file
+    // FLOAT: some decimal written in list files
+    optional DataType data_type = 5 [default = IMAGE];
+    optional uint32 data_num = 6 [default = 1];
+    optional DataType label_type = 7 [default = FLOAT];
+    optional uint32 label_num = 8 [default = 1];
+
+    // --------------------  image fetch specification  ---------------------
+    repeated string root_folder = 9;
+    optional uint32 new_height = 10 [default = 0];
+    optional uint32 new_width = 11 [default = 0];
+    optional uint32 new_max_size = 16 [default = 0];
+    optional bool is_color = 12 [default = true];
+    optional uint32 thread_num = 13 [default = 0];
+    optional float cache_in_gb = 14 [default = 0];
+
+    // ----------------------------  others  --------------------------------
+    optional bool debug_info = 15 [default = false];
+}
+
+message MRNGParameter {
+  enum MRNGType{
+    UNIFORM = 0;
+    NORMAL = 1;
+  }
+  optional MRNGType type = 1 [default = UNIFORM];
+  optional float min  = 2 [default = 0];
+  optional float max  = 3 [default = 0];
+  optional float mean  = 4 [default = 0];
+  optional float std  = 5 [default = 0];
+}
+
+message AugTransformationParameter {
+  optional bool normalize = 107 [default = false];
+  optional float light = 108 [default = 1.0];
+
+  optional float aug_prob = 101 [default = 0.0];
+
+  optional uint32 crop_size = 103 [default = 0];
+  optional uint32 crop_w = 104 [default = 0];
+  optional uint32 crop_h = 105 [default = 0];
+
+  optional bool trans = 106 [default = false];
+  optional MRNGParameter trans_rng = 109;
+  optional float trans_x = 110;
+  optional MRNGParameter trans_x_rng = 111;
+  optional float trans_y = 112;
+  optional MRNGParameter trans_y_rng = 113;
+
+  optional bool rotate = 114 [default = false];
+  optional float rotate_deg = 115;
+  optional MRNGParameter rotate_rng = 116;
+
+  optional bool zoom = 117 [default = false];
+  optional float zoom_scale = 119;
+  optional MRNGParameter zoom_rng = 120;
+
+  optional bool occlusion = 127 [default = false];
+  optional uint32 occlusion_width = 128;
+  optional MRNGParameter occlusion_width_rng = 133;
+  optional uint32 occlusion_height = 129;
+  optional MRNGParameter occlusion_height_rng = 134;
+  optional MRNGParameter occlusion_size_rng = 138;
+  optional uint32 occlusion_center_x = 130;
+  optional MRNGParameter occlusion_center_x_rng = 135;
+  optional uint32 occlusion_center_y = 131;
+  optional MRNGParameter occlusion_center_y_rng = 136;
+  optional MRNGParameter occlusion_center_rng = 139;
+  optional uint32 occlusion_color = 132;
+  optional MRNGParameter occlusion_color_rng = 137;
+
+  optional bool noise = 143 [default = false];
+  optional MRNGParameter noise_rng = 144;
+
+  optional bool mirror = 125 [default = false];
+
+  enum LabelType {
+    POINT = 0 ;
+    RECT = 1 ;
+    CLASS = 2;
+    SEGMENT = 3;
+    AREA = 4;
+  }
+  // If POINT, the label is considered as a serial of point with structure like (x, y, x, y, ...)
+  // and the label will be affined together with the image when augmented.
+  // If RECT, the label is considered as a serial of rectangle with structure like (class, left, top, right, bottom, class, left, top, right, bottom, ...)
+  // and the center of this rectangle will be affined together with the image when augmented, while the size will be zoomed together.
+  // (If one rectangle's class is less than 0, the transformer won't deal with this rectangle. Thus, this is a dummy rectangle.)
+  // If CLASS, the label won't change.
+  // If MAP, the label map will also be affined together with the image with nearest interpolation.
+  // If AREA, the label will also be zoomed together with the image.
+  optional LabelType label_type = 140 [default = CLASS];
+  // For POINT, some points' index will changed after mirror. So we need a corr_list to specify the pair of points need exchange index.
+  repeated uint32 corr_list = 126;
+
+  optional bool has_weight = 141 [default = false];
+  optional bool aug_each_channel = 142 [default = false];
 }
