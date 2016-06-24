@@ -308,8 +308,8 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 147 (last added:
-// smooth_l1_loss_param).
+// LayerParameter next available layer-specific ID: 148 (last added:
+// alignment_accuracy_param).
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -366,6 +366,7 @@ message LayerParameter {
   // engine parameter for selecting the implementation.
   // The default for the engine is set by the ENGINE switch at compile-time.
   optional AccuracyParameter accuracy_param = 102;
+  optional AlignmentAccuracyParameter alignment_accuracy_param = 147;
   optional ArgMaxParameter argmax_param = 103;
   optional BatchNormParameter batch_norm_param = 139;
   optional BNParameter bn_param = 144;
@@ -1425,4 +1426,28 @@ message AugTransformationParameter {
 message SmoothL1LossParameter {
   optional float threshold = 1 [default = 1];
   optional float margin = 2 [default = 0];
+}
+
+message AlignmentAccuracyParameter {
+  optional bool seperate_accuracy = 12 [default = false];
+
+  repeated uint32 left_eye_index = 3;
+  repeated uint32 right_eye_index = 4;
+  
+  optional float scale = 8 [default = 1];
+  optional uint32 output_num = 2 [default = 0];
+  optional float output_threshold = 13 [default = 0];
+  optional string output_image_prefix = 5;
+  optional string output_error_file = 6;
+  
+  // mean pose
+  repeated float landmark_x = 9;
+  repeated float landmark_y = 10;
+  optional bool use_mean_pose = 11 [default = true];
+
+  // compute area loss for ranges of [begin, end) and point loss for other.
+  repeated uint32 begin = 14;
+  repeated uint32 end = 15;
+  optional uint32 interpolation_nums = 16 [default = 0];
+  // set 0 to disable interpolation
 }

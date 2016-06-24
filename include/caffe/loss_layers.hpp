@@ -9,6 +9,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/neuron_layers.hpp"
 #include "caffe/proto/caffe.pb.h"
+#include "opencv2/core/core.hpp"
 
 namespace caffe {
 
@@ -999,6 +1000,77 @@ protected:
   
   Dtype th;
   Dtype margin;
+};
+
+template <typename Dtype>
+class AlignmentAccuracyLayer : public Layer<Dtype> {
+ public:
+
+  explicit AlignmentAccuracyLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "AlignmentAccuracy"; }
+
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
+  virtual inline int ExactNumTopBlobs() const { return -1; }
+  virtual inline int MinNumTopBlobs() const { return 1; }
+  virtual inline int MaxNumTopBlobs() const { return 2; }
+
+ protected:
+ 
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  // AlignmentAccuracy cannot be used as loss
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+    for (int i = 0; i < propagate_down.size(); ++i) {
+      if (propagate_down[i]) { NOT_IMPLEMENTED; }
+    }
+  }
+
+  Dtype compute_inter_pupil_dis(const vector<cv::Point_<Dtype>>& point_label);
+  /*
+   * Return the average val of all points.
+   */
+  Dtype compute_err_each_point(const vector<cv::Point_<Dtype>>& point_result,
+                               const vector<cv::Point_<Dtype>>& point_label,
+                               const Dtype inter_pupil_dis,
+                               vector<Dtype>& error_each_point);
+
+  Dtype compute_area_loss(const vector<cv::Point_<Dtype>>& point_result,
+                          const vector<cv::Point_<Dtype>>& point_label,
+                          int begin, int end, Dtype inter_pupil_dis);
+
+  unsigned int point_num;
+  
+  bool seperate_accuracy;
+  
+  vector<size_t> left_eye_index;
+  vector<size_t> right_eye_index;
+  
+  bool use_mean_pose;
+  vector<cv::Point_<Dtype>> mean_pose;
+  Dtype norm_factor_static;
+  
+  bool output_image;
+  Dtype scale;
+  string output_image_prefix;
+  unsigned int output_num;
+  float output_threshold;
+  
+  bool output_error;
+  string output_error_file;
+  
+  unsigned int batch_counter;
+
+  vector<bool> point_loss_;
+  vector<vector<int> > ranges_;
+  int interpolation_nums_;
 };
 
 }  // namespace caffe
