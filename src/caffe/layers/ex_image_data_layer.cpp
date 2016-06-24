@@ -354,23 +354,6 @@ top[1]->Reshape(label_shape);
 }
 }
 
-#ifdef USE_MPI
-vector<int> top_0_shape=top[0]->shape();
-    int top_0_dim=top_0_shape.size();
-    MPI_Bcast(&top_0_dim, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    top_0_shape.resize(top_0_dim);
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(top_0_shape.data(), top_0_shape.size(), MPI_INT, 0, MPI_COMM_WORLD);
-    top[0]->Reshape(top_0_shape);
-
-    vector<int> top_1_shape=top[1]->shape();
-    int top_1_dim=top_1_shape.size();
-    MPI_Bcast(&top_1_dim, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    top_1_shape.resize(top_1_dim);
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(top_1_shape.data(), top_1_shape.size(), MPI_INT, 0, MPI_COMM_WORLD);
-    top[1]->Reshape(top_1_shape);
-#endif
 }
 
 // rewrite the LayerSetp to init prefetch in main process, check data transformer
