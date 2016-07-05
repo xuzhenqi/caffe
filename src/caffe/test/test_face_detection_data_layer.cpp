@@ -1,3 +1,4 @@
+/*
 #include <algorithm>
 #include <vector>
 #include <fstream>
@@ -248,3 +249,4 @@ TYPED_TEST(FaceDetectionDataLayerTest, TestForwardScale) {
 }
 
 } // namespace caffe
+ */

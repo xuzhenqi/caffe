@@ -24,6 +24,8 @@ FaceDetectionDataLayer<Dtype>::~FaceDetectionDataLayer<Dtype>() {
 template <typename Dtype>
 void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+  LOG(FATAL) << "Deprecated. Please ExImageDataLayer + GaussMapLayer";
+  /*
   std_ = this->layer_param_.gaussmap_param().std();
   points_ = this->layer_param_.gaussmap_param().points();
   scales_.clear();
@@ -112,6 +114,7 @@ void FaceDetectionDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& b
         .mutable_gpu_data());
   }
 #endif
+   */
 }
 
 template <typename Dtype>

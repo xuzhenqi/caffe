@@ -424,11 +424,9 @@ message ShapeLossParameter {
 
 // Message that stores parameters used to generate gauss map.
 message GaussMapParameter {
-  optional float std = 1 [default = 4];
-  optional int32 width = 2 [default = 128];
-  optional int32 height = 3 [default = 128];
-  optional int32 points = 4 [default = 5]; // Todo: move this to a new message.
-  repeated int32 scale = 5;
+  optional float ori_std = 1 [default = 10];
+  optional int32 ori_size = 2 [default = 224];
+  optional int32 size = 3 [default = 56]; // Supposed to be square.
 }
 
 // Message that stores parameters used to apply transformation

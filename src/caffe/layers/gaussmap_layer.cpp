@@ -1,6 +1,9 @@
 #include <vector>
 
 #include "caffe/common_layers.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/core/core.hpp"
+#include "opencv2/opencv.hpp"
 
 namespace caffe {
 
@@ -8,46 +11,71 @@ template <typename Dtype>
 void GaussMapLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype> *> &bottom,
                                  const vector<Blob<Dtype> *> &top) {
   Layer<Dtype>::LayerSetUp(bottom, top);
-  std_ = this->layer_param_.gaussmap_param().std();
-  width_ = this->layer_param_.gaussmap_param().width();
-  height_ = this->layer_param_.gaussmap_param().height();
+  const GaussMapParameter& param = this->layer_param_.gaussmap_param();
+  size_ = param.size();
+  scale_ = Dtype(size_) / param.ori_size();
+  std_ = param.ori_std() * scale_;
 }
 
 
 template <typename Dtype>
 void GaussMapLayer<Dtype>::Reshape(const vector<Blob<Dtype> *> &bottom,
                               const vector<Blob<Dtype> *> &top) {
+  CHECK(bottom[0]->count(1) % 2 == 0);
   vector<int> shape;
-  shape.push_back(0);
-  shape.push_back(width_);
-  shape.push_back(height_);
-  for (int i = 0; i < top.size(); ++i) {
-    shape[0] = bottom[i]->num();
-    top[i]->Reshape(shape);
+  shape.push_back(bottom[0]->num());
+  shape.push_back(bottom[0]->count(1) / 2);
+  shape.push_back(size_);
+  shape.push_back(size_);
+  top[0]->Reshape(shape);
+}
+
+template <typename Dtype>
+void GaussMapLayer<Dtype>::Gauss_map(float x, float y, int height, int width,
+                                     Dtype *map) {
+  for (int h = 0; h < height; ++h) {
+    for (int w = 0; w < width; ++w) {
+      map[h*width + w] = expf((-(h-y)*(h-y)-(w-x)*(w-x))/std_/std_);
+    }
+  }
+}
+
+template <typename Dtype>
+void GaussMapLayer<Dtype>::Regularize(int num, Dtype *map) {
+  Dtype sum = 0;
+  for (int i = 0; i < num; ++i) {
+    sum += map[i];
+  }
+  for (int i = 0; i < num; ++i) {
+    map[i] /= sum;
   }
 }
 
 template <typename Dtype>
 void GaussMapLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype> *> &bottom,
-                                  const vector<Blob<Dtype> *> &top) {
-  Dtype* top_data;
-  const Dtype* bottom_data;
-  int encode_loc, loc_width, loc_height;
-  for (int i = 0; i < top.size(); ++i) {
-    bottom_data = bottom[i]->cpu_data();
-    top_data = top[i]->mutable_cpu_data();
-    for (int n = 0; n < bottom[i]->num(); ++n) {
-      encode_loc = int(bottom_data[n] + 0.5);
-      loc_width = encode_loc / height_;
-      loc_height = encode_loc % height_;
-      for (int w = 0; w < width_; ++w) {
-        for (int h = 0; h < height_; ++h) {
-          //Todo: make exp() correspond to Dtype
-          top_data[(n*width_ + w)*height_ + h] = expf(-((w-loc_width)*
-              (w-loc_width) + (h-loc_height)*(h-loc_height))/std_/std_);
-        }
+                                       const vector<Blob<Dtype> *> &top) {
+  const Dtype* bottom_data = bottom[0]->cpu_data();
+  Dtype *top_data = top[0]->mutable_cpu_data();
+  for (int i = 0; i < bottom[0]->count(); i += 2) {
+    Gauss_map(bottom_data[i] * scale_, bottom_data[i+1] * scale_,
+              size_, size_, top_data);
+    /*
+    for (int s1 = 0; s1 < size_; ++s1) {
+      for (int s2 = 0; s2 < size_; ++s2) {
+        std::cout << top_data[s1 * size_ + s2] << " ";
       }
+      std::cout << std::endl;
     }
+     */
+    Regularize(size_ * size_, top_data);
+    /*
+    int type = sizeof(Dtype) == 4 ? CV_32FC1 : CV_64FC1;
+    cv::Mat map(size_, size_, type, (void*)top_data), map_resize;
+    cv::resize(map, map_resize, cv::Size(1000, 1000));
+    cv::imshow("mapin", map_resize);
+    cv::waitKey(0);
+     */
+    top_data += size_ * size_;
   }
 }
 

@@ -140,4 +140,3 @@ TYPED_TEST(FaceDetectionAccuracyLayerTest, TestForwardNonZero) {
 
 
 } // namespace caffe
-
