@@ -1311,6 +1311,7 @@ message BNParameter {
 message ExImageDataParameter {
     // ------------------------------  common  -----------------------------
     repeated string source = 1;
+    repeated bool batch_source = 17;
     // If use binary_source, the source will be read as a binary file with format:
     // [num] [list elements], while string is stored as [string's length (64bit) ] + [string]
     // By this way the list will be read even more faster.

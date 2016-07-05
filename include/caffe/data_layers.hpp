@@ -426,16 +426,22 @@ class ExImageDataLayer : public BaseDataLayer<Dtype> {
   void JoinPrefetchThread();
   void GetFetchList(vector<size_t> &list);
   void ShuffleImages();
+  void LoadDataLabel(const pair<vector<string>, vector<string>>& single,
+                     cv::Mat& data, cv::Mat& label);
   void LoadData(const std::vector<std::string>& item, ExImageDataParameter_DataType data_type, int data_num, cv::Mat& loaded_data);
   static void MatToBlob(const cv::Mat& mat, Blob<Dtype>& blob, ExImageDataParameter_DataType data_type);
   static void MergeBlob(const std::vector<shared_ptr<Blob<Dtype>>>& blobs, Blob<Dtype>& merged_blob);
   void ReadImageWithCache(const string& file_name, int new_height, int new_width, int new_max_size, bool is_color, cv::Mat& image);
   void ReadImageWithoutCache(const string& file_name, int new_height, int new_width, int new_max_size, bool is_color, cv::Mat& image);
 
+  // Inserting source into out.
+  void ProcessSource(const string& source, const string& root,
+                     vector<pair<vector<string>, vector<string> > >& out);
   // data source
   bool binary_source;
   std::vector<std::string> source;
   std::vector<std::string> root_folder;
+  std::vector<bool> batch_sources_;
 
   // data list
   std::vector<std::pair<std::vector<std::string>, std::vector<std::string> > > lines_;

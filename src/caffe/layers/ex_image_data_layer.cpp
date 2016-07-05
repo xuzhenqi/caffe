@@ -80,68 +80,168 @@ ExImageDataLayer<Dtype>::~ExImageDataLayer<Dtype>() {
 }
 
 template <typename Dtype>
+void ExImageDataLayer<Dtype>::ProcessSource(const string &single_source,
+     const string &root, vector<pair<vector<string>, vector<string>>>& out) {
+  std::ifstream infile;
+  infile.open(single_source.c_str(), std::ifstream::in);
+  CHECK(infile.is_open()) << "Open failed: " << single_source;
+  for (; ;) {
+    bool success = true;
+    vector<string> label;
+    if (label_type == ExImageDataParameter_DataType_IMAGE) {
+      for (size_t j = 0; j < label_num; j++) {
+        string temp;
+        if (!(infile >> temp)) {
+          success = false;
+          break;
+        }
+        temp = temp.substr(0, temp.find_first_of("\r\n"));
+        label.push_back(root + temp);
+      }
+    }
+    else {
+      vector<Dtype> label_dtype;
+      for (size_t j = 0; j < label_num; j++) {
+        float temp;
+        if (!(infile >> temp)) {
+          success = false;
+          break;
+        }
+        label_dtype.push_back(temp);
+      }
+      string one_label;
+      one_label.resize(label_dtype.size() * sizeof(Dtype));
+      memcpy(&one_label[0],
+             label_dtype.data(),
+             label_dtype.size() * sizeof(Dtype));
+      label.push_back(one_label);
+    }
+
+    vector<string> data;
+    if (data_type == ExImageDataParameter_DataType_IMAGE) {
+// TODO: Jinwei: Some previous lists have path with "space"
+// So we still read to line's end for data_type=IMAGE and data_num=1
+      if (data_num == 1) {
+        infile.get();
+        string temp;
+        getline(infile, temp);
+        temp = temp.substr(0, temp.find_first_of("\r\n"));
+        if (temp.size() == 0) {
+          success = false;
+        }
+        else {
+          data.push_back(root + temp);
+        }
+      }
+      else {
+        for (size_t j = 0; j < data_num; j++) {
+          string temp;
+          if (!(infile >> temp)) {
+            success = false;
+            break;
+          }
+          temp = temp.substr(0, temp.find_first_of("\r\n"));
+          data.push_back(root + temp);
+        }
+      }
+    }
+    else {
+      vector<Dtype> data_dtype;
+      for (size_t j = 0; j < data_num; j++) {
+        float temp;
+        if (!(infile >> temp)) {
+          success = false;
+          break;
+        }
+        data_dtype.push_back(temp);
+      }
+      string one_data;
+      one_data.resize(data_dtype.size() * sizeof(Dtype));
+      memcpy(&one_data[0],
+             data_dtype.data(),
+             data_dtype.size() * sizeof(Dtype));
+      data.push_back(one_data);
+    }
+
+    if (success) {
+      out.push_back(make_pair(data, label));
+    }
+    else {
+      break;
+    }
+  }
+  infile.close();
+}
+
+template <typename Dtype>
 void ExImageDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
-const vector<Blob<Dtype>*>& top) {
+    const vector<Blob<Dtype>*>& top) {
 
+  const ExImageDataParameter
+      &ex_image_data_param = this->layer_param_.ex_image_data_param();
 
-const ExImageDataParameter &ex_image_data_param=this->layer_param_.ex_image_data_param();
+  this->transform_type_ = this->layer_param_.transform_type();
+  CHECK_NE(this->transform_type_, LayerParameter_TransformType_NATIVE)
+    << "\n Not support native data transformer";
+  if (this->transform_type_ == LayerParameter_TransformType_AUGMENT) {
+    CHECK(this->layer_param_.has_aug_transform_param())
+      << "\n AugDataTransformer need parameters";
+  }
 
-this->transform_type_ = this->layer_param_.transform_type();
-CHECK_NE(this->transform_type_, LayerParameter_TransformType_NATIVE)
-<< "\n Not support native data transformer";
-if(this->transform_type_ == LayerParameter_TransformType_AUGMENT) {
-CHECK(this->layer_param_.has_aug_transform_param())
-<< "\n AugDataTransformer need parameters";
-}
+  binary_source = ex_image_data_param.binary_source();
 
-binary_source=ex_image_data_param.binary_source();
-for(size_t i=0;i<ex_image_data_param.source_size();i++) {
-source.push_back(ex_image_data_param.source(i));
-}
-for(size_t i=0;i<ex_image_data_param.root_folder_size();i++) {
-root_folder.push_back(ex_image_data_param.root_folder(i));
-}
-CHECK_GE(source.size(), 1)
-<< "\n At least 1 source is needed";
-CHECK(root_folder.size()==source.size() || root_folder.size()<=1)
-<< "\n Each source file should have a root folder, or use the same root folder, or use no root folder";
-if(root_folder.size()==0) {
-root_folder.push_back("");
-}
-if(root_folder.size()==1) {
-for(size_t i=1;i<source.size();i++) {
-root_folder.push_back(root_folder[0]);
-}
-}
+  CHECK_EQ(ex_image_data_param.source_size(),
+           ex_image_data_param.batch_source_size());
 
-batch_size = ex_image_data_param.batch_size();
-CHECK_GT(batch_size, 0)
-<<"\n batch_size must be positive";
+  for (size_t i = 0; i < ex_image_data_param.source_size(); i++) {
+    source.push_back(ex_image_data_param.source(i));
+    batch_sources_.push_back(ex_image_data_param.batch_source(i));
+  }
+  for (size_t i = 0; i < ex_image_data_param.root_folder_size(); i++) {
+    root_folder.push_back(ex_image_data_param.root_folder(i));
+  }
+  CHECK_GE(source.size(), 1)
+    << "\n At least 1 source is needed";
+  CHECK(root_folder.size() == source.size() || root_folder.size() <= 1)
+    << "\n Each source file should have a root folder,"
+        << "or use the same root folder, or use no root folder";
+  if (root_folder.size() == 0) {
+    root_folder.push_back("");
+  }
+  if (root_folder.size() == 1) {
+    for (size_t i = 1; i < source.size(); i++) {
+      root_folder.push_back(root_folder[0]);
+    }
+  }
 
-new_height = ex_image_data_param.new_height();
-new_width  = ex_image_data_param.new_width();
-CHECK((new_height == 0 && new_width == 0) || (new_height > 0 && new_width > 0))
-<< "\n Current implementation requires new_height and new_width to be set at the same time";
-new_max_size = ex_image_data_param.new_max_size();
+  batch_size = ex_image_data_param.batch_size();
+  CHECK_GT(batch_size, 0) << "\n batch_size must be positive";
 
-data_type = ex_image_data_param.data_type();
-data_num = ex_image_data_param.data_num();
-CHECK_GT(data_num, 0)
-<< "\n data num must be positive";
-label_type = ex_image_data_param.label_type();
-label_num = ex_image_data_param.label_num();
-CHECK_GT(data_num, 0)
-<< "\n label num must be positive";
+  new_height = ex_image_data_param.new_height();
+  new_width = ex_image_data_param.new_width();
+  CHECK((new_height == 0 && new_width == 0) ||
+      (new_height > 0 && new_width > 0)) << "\n Current implementation "
+      "requires new_height and new_width to be set at the same time";
+  new_max_size = ex_image_data_param.new_max_size();
 
-need_shuffle = ex_image_data_param.shuffle();
-is_color = ex_image_data_param.is_color();
-cache_in_byte = ex_image_data_param.cache_in_gb()*(unsigned long long)1024*1024*1024;
-used_cache_in_byte = 0;
+  data_type = ex_image_data_param.data_type();
+  data_num = ex_image_data_param.data_num();
+  CHECK_GT(data_num, 0)
+    << "\n data num must be positive";
+  label_type = ex_image_data_param.label_type();
+  label_num = ex_image_data_param.label_num();
+  CHECK_GT(data_num, 0) << "\n label num must be positive";
+
+  need_shuffle = ex_image_data_param.shuffle();
+  is_color = ex_image_data_param.is_color();
+  cache_in_byte = ex_image_data_param.cache_in_gb() *
+      (unsigned long long) 1024 * 1024 * 1024;
+  used_cache_in_byte = 0;
 
 // Read the list
-for(int i=0;i<source.size();i++) {
-LOG(INFO) << "Opening file " << source[i] << "  ...";
-if(binary_source) {
+  for (int i = 0; i < source.size(); i++) {
+    LOG(INFO) << "Opening file " << source[i] << "  ...";
+    if (binary_source) {
 // FILE *fp_in=fopen(source[i].c_str(), "rb");
 // CHECK(fp_in)
 // << "\n Open failed: " << source[p];
@@ -168,191 +268,130 @@ if(binary_source) {
 //     lines_.push_back(make_pair(root_folder[p]+filename, label));
 // }
 // fclose(fp_in);
-NOT_IMPLEMENTED;
-}
-else {
-std::ifstream infile;
-infile.open(source[i].c_str(), std::ifstream::in);
-CHECK(infile.is_open())
-<< "\n Open failed: " << source[i];
-for(;;) {
-bool success=true;
-vector<string> label;
-if(label_type==ExImageDataParameter_DataType_IMAGE) {
-for(size_t j=0;j<label_num;j++) {
-string temp;
-if(!(infile>>temp)) {
-success=false;
-break;
-}
-temp=temp.substr(0, temp.find_first_of("\r\n"));
-label.push_back(root_folder[i]+temp);
-}
-}
-else {
-vector<Dtype> label_dtype;
-for(size_t j=0;j<label_num;j++) {
-float temp;
-if(!(infile>>temp)) {
-success=false;
-break;
-}
-label_dtype.push_back(temp);
-}
-string one_label;
-one_label.resize(label_dtype.size()*sizeof(Dtype));
-memcpy(&one_label[0], label_dtype.data(), label_dtype.size()*sizeof(Dtype));
-label.push_back(one_label);
-}
+      NOT_IMPLEMENTED;
+    } else if (batch_sources_[i]) {
+      CHECK(label_type != ExImageDataParameter_DataType_IMAGE);
+      CHECK(data_type == ExImageDataParameter_DataType_IMAGE);
+      std::ifstream infile;
+      infile.open(source[i].c_str(), std::ifstream::in);
+      CHECK(infile.is_open()) << "Open failed: " << source[i];
+      string single_source, root;
+      while(infile >> single_source >> root) {
+        vector<pair<vector<string>, vector<string>>> temp;
+        ProcessSource(root_folder[i] + single_source, root, temp);
+        pair<vector<string>, vector<string>> temp_pair;
+        for(int index_temp = 0; index_temp < temp.size(); ++index_temp) {
+          temp_pair.first.insert(temp_pair.first.end(),
+                                 temp[i].first.begin(),
+                                 temp[i].first.end());
+          temp_pair.second.insert(temp_pair.second.end(),
+              temp[i].second.begin(), temp[i].second.end());
+        }
+        lines_.push_back(temp_pair);
+      }
+      infile.close();
+    } else {
+      ProcessSource(source[i], root_folder[i], lines_);
+    }
+  }
+  CHECK(lines_.size() > 0) << "\n No images in this list";
+  lines_index.resize(lines_.size());
+  for (size_t i = 0; i < lines_.size(); i++) {
+    lines_index[i] = i;
+  }
+  lines_id_ = 0;
 
-vector<string> data;
-if(data_type==ExImageDataParameter_DataType_IMAGE) {
-// TODO: Jinwei: Some previous lists have path with "space"
-// So we still read to line's end for data_type=IMAGE and data_num=1
-if(data_num==1) {
-infile.get();
-string temp;
-getline(infile, temp);
-temp=temp.substr(0, temp.find_first_of("\r\n"));
-if(temp.size()==0) {
-success=false;
-}
-else {
-data.push_back(root_folder[i]+temp);
-}
-}
-else {
-for(size_t j=0;j<data_num;j++) {
-string temp;
-if(!(infile>>temp)) {
-success=false;
-break;
-}
-temp=temp.substr(0, temp.find_first_of("\r\n"));
-data.push_back(root_folder[i]+temp);
-}
-}
-}
-else {
-vector<Dtype> data_dtype;
-for(size_t j=0;j<data_num;j++) {
-float temp;
-if(!(infile>>temp)) {
-success=false;
-break;
-}
-data_dtype.push_back(temp);
-}
-string one_data;
-one_data.resize(data_dtype.size()*sizeof(Dtype));
-memcpy(&one_data[0], data_dtype.data(), data_dtype.size()*sizeof(Dtype));
-data.push_back(one_data);
-}
+  set<string> image_set;
+  for (size_t i = 0; i < lines_.size(); i++) {
+    if (data_type == ExImageDataParameter_DataType_IMAGE) {
+      for (size_t j = 0; j < lines_[i].first.size(); j++) {
+        image_set.insert(lines_[i].first[j]);
+      }
+    }
+    if (label_type == ExImageDataParameter_DataType_IMAGE) {
+      for (size_t j = 0; j < lines_[i].second.size(); j++) {
+        image_set.insert(lines_[i].second[j]);
+      }
+    }
+  }
+  total_image_num = image_set.size();
+  LOG(INFO) << "A total of " << total_image_num << " images.";
 
-if(success) {
-lines_.push_back(make_pair(data, label));
-}
-else {
-break;
-}
-}
-infile.close();
-}
-}
-CHECK(lines_.size()>0)
-<< "\n No images in this list";
-lines_index.resize(lines_.size());
-for(size_t i=0;i<lines_.size();i++) {
-lines_index[i]=i;
-}
-lines_id_=0;
-
-set<string> image_set;
-for(size_t i=0;i<lines_.size();i++) {
-if(data_type==ExImageDataParameter_DataType_IMAGE) {
-for(size_t j=0;j<lines_[i].first.size();j++) {
-image_set.insert(lines_[i].first[j]);
-}
-}
-if(label_type==ExImageDataParameter_DataType_IMAGE) {
-for(size_t j=0;j<lines_[i].second.size();j++) {
-image_set.insert(lines_[i].second[j]);
-}
-}
-}
-total_image_num=image_set.size();
-LOG(INFO) << "A total of " << total_image_num << " images.";
-
-cache_finished=false;
+  cache_finished = false;
 
 // randomly shuffle data
-if (need_shuffle) {
-LOG(INFO) << "Shuffling data ...";
-prefetch_rng_.reset(new Caffe::RNG(caffe_rng_rand()));
-ShuffleImages();
-}
+  if (need_shuffle) {
+    LOG(INFO) << "Shuffling data ...";
+    prefetch_rng_.reset(new Caffe::RNG(caffe_rng_rand()));
+    ShuffleImages();
+  }
 
-prefetch_thread_num = ex_image_data_param.thread_num();
+  prefetch_thread_num = ex_image_data_param.thread_num();
 
-if(this->layer_param_.ex_image_data_param().debug_info()) {
-LOG(INFO) << "[Multithread] prefetch_thread_num: " <<prefetch_thread_num;
-}
-this->prefetch_thread_v_.resize(prefetch_thread_num);
-for (int ipt = 0; ipt < prefetch_thread_num; ++ipt) {
-this->prefetch_thread_v_[ipt].reset(new PrefetchThreadInfo<Dtype>());
-this->prefetch_thread_v_[ipt]->transformed_data_v.resize(batch_size);
-this->prefetch_thread_v_[ipt]->transformed_label_v.resize(batch_size);
-for (size_t i = 0; i < batch_size; i++) {
-this->prefetch_thread_v_[ipt]->transformed_data_v[i].reset(
-new Blob<Dtype>);
-this->prefetch_thread_v_[ipt]->transformed_label_v[i].reset(
-new Blob<Dtype>);
-}
-}
-if(this->layer_param_.ex_image_data_param().debug_info()) {
-LOG(INFO) << "[Multithread] Initialize prefetch_thread_v_";
-}
+  if (this->layer_param_.ex_image_data_param().debug_info()) {
+    LOG(INFO) << "[Multithread] prefetch_thread_num: " << prefetch_thread_num;
+  }
+  this->prefetch_thread_v_.resize(prefetch_thread_num);
+  for (int ipt = 0; ipt < prefetch_thread_num; ++ipt) {
+    this->prefetch_thread_v_[ipt].reset(new PrefetchThreadInfo<Dtype>());
+    this->prefetch_thread_v_[ipt]->transformed_data_v.resize(batch_size);
+    this->prefetch_thread_v_[ipt]->transformed_label_v.resize(batch_size);
+    for (size_t i = 0; i < batch_size; i++) {
+      this->prefetch_thread_v_[ipt]->transformed_data_v[i].reset(
+          new Blob<Dtype>);
+      this->prefetch_thread_v_[ipt]->transformed_label_v[i].reset(
+          new Blob<Dtype>);
+    }
+  }
+  if (this->layer_param_.ex_image_data_param().debug_info()) {
+    LOG(INFO) << "[Multithread] Initialize prefetch_thread_v_";
+  }
 
 // reshape blobs
-cv::Mat cv_data;
-cv::Mat cv_label;
-LoadData(lines_[lines_index[lines_id_]].first, data_type, data_num, cv_data);
-LoadData(lines_[lines_index[lines_id_]].second, label_type, label_num, cv_label);
-if(this->transform_type_ == LayerParameter_TransformType_AUGMENT) {
-this->aug_data_transformer_->Transform(
-    cv_data, cv_label,
-*(this->prefetch_thread_v_[0]->transformed_data_v[0]),
-*(this->prefetch_thread_v_[0]->transformed_label_v[0]));
-vector<int> data_shape=
-    this->prefetch_thread_v_[0]->transformed_data_v[0]->shape();
-vector<int> label_shape=
-    this->prefetch_thread_v_[0]->transformed_label_v[0]->shape();
-data_shape[0]=batch_size;
-label_shape[0]=batch_size;
-top[0]->Reshape(data_shape);
-top[1]->Reshape(label_shape);
-}
-else {
-if(data_type==ExImageDataParameter_DataType_IMAGE) {
-top[0]->Reshape(batch_size, cv_data.channels(), cv_data.rows, cv_data.cols);
-}
-else {
-vector<int> data_shape(2);
-data_shape[0]=batch_size;
-data_shape[1]=data_num;
-top[0]->Reshape(data_shape);
-}
+  cv::Mat cv_data;
+  cv::Mat cv_label;
+  LoadDataLabel(lines_[lines_index[lines_id_]], cv_data, cv_label);
+  if (this->transform_type_ == LayerParameter_TransformType_AUGMENT) {
+    this->aug_data_transformer_->Transform(
+        cv_data, cv_label,
+        *(this->prefetch_thread_v_[0]->transformed_data_v[0]),
+        *(this->prefetch_thread_v_[0]->transformed_label_v[0]));
+    vector<int> data_shape =
+        this->prefetch_thread_v_[0]->transformed_data_v[0]->shape();
+    vector<int> label_shape =
+        this->prefetch_thread_v_[0]->transformed_label_v[0]->shape();
+    data_shape[0] = batch_size;
+    label_shape[0] = batch_size;
+    top[0]->Reshape(data_shape);
+    top[1]->Reshape(label_shape);
+  }
+  else {
+    if (data_type == ExImageDataParameter_DataType_IMAGE) {
+      top[0]->Reshape(batch_size,
+                      cv_data.channels(),
+                      cv_data.rows,
+                      cv_data.cols);
+    }
+    else {
+      vector<int> data_shape(2);
+      data_shape[0] = batch_size;
+      data_shape[1] = data_num;
+      top[0]->Reshape(data_shape);
+    }
 
-if(label_type==ExImageDataParameter_DataType_IMAGE) {
-top[1]->Reshape(batch_size, cv_label.channels(), cv_label.rows, cv_label.cols);
-}
-else {
-vector<int> label_shape(2);
-label_shape[0]=batch_size;
-label_shape[1]=label_num;
-top[1]->Reshape(label_shape);
-}
-}
+    if (label_type == ExImageDataParameter_DataType_IMAGE) {
+      top[1]->Reshape(batch_size,
+                      cv_label.channels(),
+                      cv_label.rows,
+                      cv_label.cols);
+    }
+    else {
+      vector<int> label_shape(2);
+      label_shape[0] = batch_size;
+      label_shape[1] = label_num;
+      top[1]->Reshape(label_shape);
+    }
+  }
 
 }
 
@@ -360,83 +399,87 @@ top[1]->Reshape(label_shape);
 template <typename Dtype>
 void ExImageDataLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-if (top.size() == 1) {
-this->output_labels_ = false;
-} else {
-this->output_labels_ = true;
-}
-CHECK_NE(this->layer_param_.transform_type(), LayerParameter_TransformType_NATIVE)
-<< "\n Not support native data transformer";
-this->data_transformer_.reset(new DataTransformer<Dtype>(this->layer_param_.transform_param(), this->phase_));
-this->data_transformer_->InitRand();
-if(this->layer_param_.transform_type()==LayerParameter_TransformType_AUGMENT) {
-this->aug_data_transformer_.reset(new AugDataTransformer<Dtype>(this->layer_param_.aug_transform_param(), this->phase_));
-this->aug_data_transformer_->InitRand();
-}
-DataLayerSetUp(bottom, top);
+  if (top.size() == 1) {
+    this->output_labels_ = false;
+  } else {
+    this->output_labels_ = true;
+  }
+  CHECK_NE(this->layer_param_.transform_type(),
+           LayerParameter_TransformType_NATIVE)
+    << "\n Not support native data transformer";
+  this->data_transformer_.reset(new DataTransformer<Dtype>(this->layer_param_.transform_param(),
+                                                           this->phase_));
+  this->data_transformer_->InitRand();
+  if (this->layer_param_.transform_type()
+      == LayerParameter_TransformType_AUGMENT) {
+    this->aug_data_transformer_.reset(new AugDataTransformer<Dtype>(this->layer_param_.aug_transform_param(),
+                                                                    this->phase_));
+    this->aug_data_transformer_->InitRand();
+  }
+  DataLayerSetUp(bottom, top);
 
-this->CreatePrefetchThread();
+  this->CreatePrefetchThread();
 }
 
 // rewrite the forward to apply forward only in main process
 template <typename Dtype>
 void ExImageDataLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-shared_ptr<PrefetchThreadInfo<Dtype>> cur_thread_info =
-    prefetch_thread_v_[next_prefetch_thread_++];
-if (next_prefetch_thread_ == prefetch_thread_num) {
-next_prefetch_thread_ = 0;
-}
+  shared_ptr<PrefetchThreadInfo<Dtype>> cur_thread_info =
+      prefetch_thread_v_[next_prefetch_thread_++];
+  if (next_prefetch_thread_ == prefetch_thread_num) {
+    next_prefetch_thread_ = 0;
+  }
 
-cur_thread_info->end_.wait();
-GetFetchList(cur_thread_info->list_);
-cur_thread_info->start_.signal();
+  cur_thread_info->end_.wait();
+  GetFetchList(cur_thread_info->list_);
+  cur_thread_info->start_.signal();
 
 // Reshape to loaded data.
-top[0]->ReshapeLike(cur_thread_info->data_);
+  top[0]->ReshapeLike(cur_thread_info->data_);
 // Copy the data
-caffe_copy(cur_thread_info->data_.count(),
-    cur_thread_info->data_.cpu_data(),
-    top[0]->mutable_cpu_data());
-DLOG(INFO) << "Prefetch copied";
-if (this->output_labels_) {
+  caffe_copy(cur_thread_info->data_.count(),
+             cur_thread_info->data_.cpu_data(),
+             top[0]->mutable_cpu_data());
+  DLOG(INFO) << "Prefetch copied";
+  if (this->output_labels_) {
 // Reshape to loaded labels.
-top[1]->ReshapeLike(cur_thread_info->label_);
+    top[1]->ReshapeLike(cur_thread_info->label_);
 // Copy the labels.
-caffe_copy(cur_thread_info->label_.count(),
-    cur_thread_info->label_.cpu_data(),
-    top[1]->mutable_cpu_data());
-}
+    caffe_copy(cur_thread_info->label_.count(),
+               cur_thread_info->label_.cpu_data(),
+               top[1]->mutable_cpu_data());
+  }
 }
 
 template <typename Dtype>
 void ExImageDataLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-shared_ptr<PrefetchThreadInfo<Dtype>> cur_thread_info =
-    prefetch_thread_v_[next_prefetch_thread_++];
-if (next_prefetch_thread_ == prefetch_thread_num) {
-next_prefetch_thread_ = 0;
-}
+  shared_ptr<PrefetchThreadInfo<Dtype>> cur_thread_info =
+      prefetch_thread_v_[next_prefetch_thread_++];
+  if (next_prefetch_thread_ == prefetch_thread_num) {
+    next_prefetch_thread_ = 0;
+  }
 
-cur_thread_info->end_.wait();
-GetFetchList(cur_thread_info->list_);
-cur_thread_info->start_.signal();
+  cur_thread_info->end_.wait();
+  GetFetchList(cur_thread_info->list_);
+  cur_thread_info->start_.signal();
 
 // Reshape to loaded data.
-top[0]->ReshapeLike(cur_thread_info->data_);
+  top[0]->ReshapeLike(cur_thread_info->data_);
 // Copy the data
-caffe_copy(cur_thread_info->data_.count(),
-    cur_thread_info->data_.gpu_data(),
-    top[0]->mutable_gpu_data());
-DLOG(INFO) << "Prefetch copied";
-if (this->output_labels_) {
+  caffe_copy(cur_thread_info->data_.count(),
+             cur_thread_info->data_.gpu_data(),
+             top[0]->mutable_gpu_data());
+  DLOG(INFO) << "Prefetch copied";
+  if (this->output_labels_) {
 // Reshape to loaded labels.
-top[1]->ReshapeLike(cur_thread_info->label_);
+    top[1]->ReshapeLike(cur_thread_info->label_);
 // Copy the labels.
-caffe_copy(cur_thread_info->label_.count(),
-    cur_thread_info->label_.gpu_data(),
-    top[1]->mutable_gpu_data());
-}
+    caffe_copy(cur_thread_info->label_.count(),
+               cur_thread_info->label_.gpu_data(),
+               top[1]->mutable_gpu_data());
+  }
 }
 
 // to shuffle images
@@ -494,10 +537,7 @@ void ExImageDataLayer<Dtype>::InternalThreadEntry(int index) {
     for (int i = 0; i < batch_size; i++) {
       cv::Mat cv_data;
       cv::Mat cv_label;
-      LoadData(lines_[cur_thread_info->list_[i]].first, data_type,
-               data_num, cv_data);
-      LoadData(lines_[cur_thread_info->list_[i]].second, label_type,
-               label_num, cv_label);
+      LoadDataLabel(lines_[cur_thread_info->list_[i]], cv_data, cv_label);
       if (this->transform_type_ == LayerParameter_TransformType_NONE) {
         MatToBlob(cv_data, *(cur_thread_info->transformed_data_v[i]),
                   data_type);
@@ -530,8 +570,31 @@ void ExImageDataLayer<Dtype>::InternalThreadEntry(int index) {
 }
 
 template <typename Dtype>
+void ExImageDataLayer<Dtype>::LoadDataLabel(
+    const pair<vector<string>, vector<string>> &single, cv::Mat &data,
+    cv::Mat &label) {
+  bool batch_item = ((data_type == ExImageDataParameter_DataType_IMAGE) &&
+      (label_type != ExImageDataParameter_DataType_IMAGE) &&
+      (data_num < single.first.size()));
+  if (batch_item) {
+    boost::uniform_int<> dist(0, single.first.size() / data_num - 1);
+    int rand = dist(*(caffe_rng()));
+    vector<string> item_data(single.first.begin() + rand * data_num,
+                             single.first.begin() + (rand + 1) * data_num);
+    vector<string> item_label(single.second.begin() + rand * data_num,
+          single.second.begin() + (rand + 1) * data_num);
+    LoadData(item_data, data_type, data_num, data);
+    LoadData(item_label, label_type, label_num, label);
+  } else {
+    LoadData(single.first, data_type, data_num, data);
+    LoadData(single.second, label_type, label_num, label);
+  }
+}
+
+template <typename Dtype>
 void ExImageDataLayer<Dtype>::LoadData(const vector<string>& item,
-                                       ExImageDataParameter_DataType data_type, int data_num, Mat& loaded_data) {
+                                       ExImageDataParameter_DataType data_type,
+                                       int data_num, Mat& loaded_data) {
   if(data_type==ExImageDataParameter_DataType_IMAGE) {
     if(data_num==1) {
       ReadImageWithCache(item[0], new_height, new_width, new_max_size, is_color, loaded_data);
@@ -581,18 +644,20 @@ void ExImageDataLayer<Dtype>::MatToBlob(const cv::Mat& mat, Blob<Dtype>& blob, E
 
 template <typename Dtype>
 void ExImageDataLayer<Dtype>::MergeBlob(const std::vector<shared_ptr<Blob<Dtype>>>& blobs, Blob<Dtype>& merged_blob) {
-CHECK_GT(blobs.size(), 0);
-for(size_t i=0;i<blobs.size();i++) {
-CHECK(blobs[i]->shape()==blobs[0]->shape())
-<< "\n shape mismatch";
-}
-vector<int> blob_shape=blobs[0]->shape();
-blob_shape[0]=blobs.size();
-merged_blob.Reshape(blob_shape);
-Dtype* blob_data = merged_blob.mutable_cpu_data();
-for(size_t i=0;i<blobs.size();i++) {
-caffe_copy(merged_blob.count(1), blobs[i]->cpu_data(), blob_data+merged_blob.offset(i));
-}
+  CHECK_GT(blobs.size(), 0);
+  for (size_t i = 0; i < blobs.size(); i++) {
+    CHECK(blobs[i]->shape() == blobs[0]->shape())
+    << "\n shape mismatch";
+  }
+  vector<int> blob_shape = blobs[0]->shape();
+  blob_shape[0] = blobs.size();
+  merged_blob.Reshape(blob_shape);
+  Dtype *blob_data = merged_blob.mutable_cpu_data();
+  for (size_t i = 0; i < blobs.size(); i++) {
+    caffe_copy(merged_blob.count(1),
+               blobs[i]->cpu_data(),
+               blob_data + merged_blob.offset(i));
+  }
 }
 
 // load images with cache, to accelerate
