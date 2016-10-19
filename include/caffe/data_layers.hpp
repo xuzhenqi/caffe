@@ -300,6 +300,34 @@ class ImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
   int lines_id_;
 };
 
+template <typename Dtype>
+class SimpleDataLayer : public BasePrefetchingDataLayer<Dtype> {
+ public:
+  explicit SimpleDataLayer(const LayerParameter& param)
+      : BasePrefetchingDataLayer<Dtype>(param), cur_(0){}
+  virtual ~SimpleDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  
+  virtual inline const char* type() const { return "SimpleData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+ 
+ private:
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+  virtual void ShuffleData();
+  virtual void load_batch(Batch<Dtype>* batch);
+
+  bool shuffle_;
+//  int fields_begin_;
+//  int fields_end_;
+//  int stride_;
+  int nums_;
+  int batch_size_;
+  int cur_;
+  vector<vector<Dtype>> buffer_;
+};
+
 /**
  * @brief Provides data to the Net from memory.
  *
