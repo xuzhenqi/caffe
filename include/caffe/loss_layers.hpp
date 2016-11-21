@@ -306,7 +306,7 @@ class EuclideanLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> diff_;
 };
 
-/**
+/** Deprecated
  * @brief Computes the classification accuracy for a one-of-many
  *        classification task.
  */
@@ -326,6 +326,39 @@ class FaceDetectionAccuracyLayer : public Layer<Dtype> {
   // accuracies per class.
   virtual inline int MinTopBlobs() const { return 1; }
   virtual inline int MaxTopBlobs() const { return 2; }
+
+  inline Dtype square(Dtype x) {
+    return x * x;
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
+
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down,
+                            const vector<Blob<Dtype>*>& bottom) {
+    for (int i = 0; i < propagate_down.size(); ++i) {
+      if (propagate_down[i]) { NOT_IMPLEMENTED; }
+    }
+  }
+};
+
+/**
+ * @brief Computes NME between two shapes for 300W 68 points
+ */
+template <typename Dtype>
+class AlignmentAccuracyLayer : public Layer<Dtype> {
+ public:
+  explicit AlignmentAccuracyLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "AlignmentAccuracy"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const {return 3; }
 
   inline Dtype square(Dtype x) {
     return x * x;

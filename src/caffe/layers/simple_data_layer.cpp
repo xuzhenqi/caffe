@@ -27,7 +27,10 @@ void SimpleDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   string temp;
   while(infile >> temp) {
     buffer_.push_back(vector<Dtype>(nums_));
-    for (int i = 0; i < nums_; ++i) infile >> buffer_.back()[i];
+    for (int i = 0; i < nums_; ++i) {
+      infile >> buffer_.back()[i];
+      CHECK_EQ(infile.fail(), false);
+    }
   }
   LOG(INFO) << "Loading " << buffer_.size() << " recods.";
   
